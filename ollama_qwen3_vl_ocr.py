@@ -12,6 +12,7 @@ from pathlib import Path
 from aigc2d_ocr import (
     combined_output_path,
     page_number,
+    normalize_name_separators,
     replace_combined_page,
     select_images,
     write_combined_text,
@@ -26,6 +27,7 @@ OCR_PROMPT = """画像内の日本語漫画テキストを正確に文字起こ�
 漢字本文を読み仮名に置き換えたり、読み仮名を漢字本文の前後に連結したりしないでください。
 例：画像に「今日」とルビ「きょう」がある場合は「今日」だけを出力し、「きょう」にしないでください。
 本文と異なる読み方、特別な意味、独立した文字の場合だけ出力してください。
+人名の区切り記号には必ず「・」を使い、「＝」や「=」を混在させないでください。
 背景の透かし「CONFIDENTIAL」は本文ではないため、絶対に出力しないでください。
 段落は空行で区切り、判読不能な文字は「〓」にしてください。"""
 
@@ -37,6 +39,7 @@ OCR_REVIEW_PROMPT = """画像とOCR初稿を照合し、日本語漫画の文字
 初稿にある漢字を仮名へ置き換えたり、仮名を漢字の前後へ追加したりしてはいけません。
 校正後は初稿より漢字を減らさず、仮名を増やさないでください。
 初稿が「きょうから」でも、画像に漢字本文「今日」とルビ「きょう」が見える場合は「今日から」に直してください。
+人名の区切り記号は「・」に統一し、「＝」や「=」を残さないでください。
 OCRの縦書きや吹き出し幅による改行を残さず、同じ吹き出し内の文章を必ず一行にまとめてください。
 タイトル、別の吹き出し、別の話者、独立した効果音はそれぞれ別のsegments要素にしてください。
 各segments要素の中には改行を入れないでください。"""
@@ -191,7 +194,7 @@ def remove_likely_ruby(text: str) -> str:
     cleaned = LIKELY_RUBY_BEFORE_KANJI.sub("", text)
     for reading, kanji in COMMON_KANJI_RESTORATIONS.items():
         cleaned = cleaned.replace(reading, kanji)
-    return cleaned
+    return normalize_name_separators(cleaned)
 
 
 def invalid_review_reason(reviewed: str, draft: str) -> str | None:

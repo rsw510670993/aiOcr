@@ -70,9 +70,107 @@ ollama serve
 - 每页文本用于中断恢复，全部识别完成后默认自动删除
 - 每页初次识别后会再次调用 Qwen3-VL 校对，将同一气泡的断句合并为一行
 - 校对后汉字减少或假名增加时会拒绝校对结果，避免正文汉字退化为注音
+- 姓名内部的分隔符统一使用 `・`，不会混用 `＝` 或 `=`
 
 需要保留每页文本时添加 `--keep-page-files`。
 不需要第二次 OCR 校对时添加 `--no-review`。
+
+## 远程 AIGC2D OCR
+
+使用 `aigc2d.key` 调用远程 API 识别第 7 至 56 页：
+
+```powershell
+.\.venv\Scripts\python.exe .\aigc2d_ocr.py `
+  --image-dir .\exported_jpg `
+  --pages 7-56 `
+  --combined-output .\ocr_text\pages_0007-0056.txt
+```
+
+远程请求中断或超时后，使用相同参数并添加 `--resume`：
+
+```powershell
+.\.venv\Scripts\python.exe .\aigc2d_ocr.py `
+  --image-dir .\exported_jpg `
+  --pages 7-56 `
+  --resume `
+  --combined-output .\ocr_text\pages_0007-0056.txt
+```
+
+远程 OCR 会复用已有正常逐页文件，从缺失或异常页面继续。每页完成后立即
+更新合并文件；全部成功后默认删除逐页中间文件。默认单次请求超时 300 秒。
+远程提示词要求模型将同一气泡内的断行拼成一行；脚本会删除空白行，
+同时保留模型返回的非空行，避免错误合并不同气泡。
+
+远程 OCR 全部完成后会默认进行一次全文一致性检查。模型会检查跨页人物名、
+专有名词和称呼是否突然变化，并自动重新识别可疑页面后更新合并文件。
+姓名内部的分隔符会统一为 `・`。
+
+单独重新识别某一页，并覆盖合并文件中原有的该页内容：
+
+```powershell
+.\.venv\Scripts\python.exe .\aigc2d_ocr.py `
+  --image-dir .\exported_jpg `
+  --review-page 49 `
+  --combined-output .\ocr_text\pages_0035-0058.txt
+```
+
+该命令只替换合并文件中的 `P49`，其他页面保持不变。
+
+仅检查已经完成的合并文件：
+
+```powershell
+.\.venv\Scripts\python.exe .\aigc2d_ocr.py `
+  --image-dir .\exported_jpg `
+  --pages 35-58 `
+  --combined-output .\ocr_text\pages_0035-0058.txt `
+  --consistency-check-only
+```
+
+不需要全文一致性检查时添加 `--no-consistency-check`。
+
+AIGC2D OCR 默认使用 `gemini-3.1-flash-lite`。传入 `--model` 可切换模型：
+
+```powershell
+.\.venv\Scripts\python.exe .\aigc2d_ocr.py `
+  --image-dir .\exported_jpg `
+  --pages 7-56 `
+  --model "目标模型名"
+```
+
+## 远程 AIGC2D 翻译
+
+使用 AIGC2D 将 OCR 合并文本翻译为简体中文：
+
+```powershell
+.\.venv\Scripts\python.exe .\aigc2d_translate.py `
+  .\ocr_text\pages_0007-0056.txt
+```
+
+译文默认保存到 `aigc2d_translation_text/同名文件`。默认将全部选中页面
+一次提交给 API，让模型联系前后文，并校验所有 `P{页码}` 标记完整保留。
+工具会读取 `名词表.csv`、拒绝残留日文并统一括号格式。
+术语表匹配会统一 `・`、`·`、`＝`、`=` 等分隔符；源文只出现名字简称时，
+也会按表中的全名映射要求使用对应中文简称。
+
+远程翻译中断后继续：
+
+```powershell
+.\.venv\Scripts\python.exe .\aigc2d_translate.py `
+  .\ocr_text\pages_0007-0056.txt `
+  --per-page `
+  --resume
+```
+
+`--resume` 仅用于备用的 `--per-page` 模式。逐页模式全部完成后默认删除
+中间译文；需要保留时添加 `--keep-page-files`。
+
+AIGC2D 翻译同样默认使用 `gemini-3.1-flash-lite`，也可通过参数切换：
+
+```powershell
+.\.venv\Scripts\python.exe .\aigc2d_translate.py `
+  .\ocr_text\pages_0007-0056.txt `
+  --model "目标模型名"
+```
 
 重新校对某一页并原位更新现有合并 OCR 文件：
 

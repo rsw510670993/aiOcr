@@ -9,7 +9,11 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from aigc2d_ocr import parse_combined_text, replace_combined_page
+from aigc2d_ocr import (
+    normalize_name_separators,
+    parse_combined_text,
+    replace_combined_page,
+)
 
 
 SYSTEM_PROMPT = """你是专业的日语漫画汉化翻译。
@@ -184,9 +188,74 @@ def load_glossary(path: Path) -> tuple[list[tuple[str, str]], list[str]]:
     return terms, skills
 
 
+def normalize_glossary_key(text: str) -> str:
+    normalized = normalize_name_separators(text.strip())
+    normalized = re.sub(r"[·･・＝=]+", "・", normalized)
+    return normalized.strip("・")
+
+
+def glossary_aliases(japanese: str) -> list[str]:
+    normalized = normalize_glossary_key(japanese)
+    aliases = [normalized]
+    for part in re.split(r"[・·･＝=]", normalized):
+        part = part.strip()
+        if len(part) >= 2:
+            aliases.append(part)
+    unique = []
+    for alias in aliases:
+        if alias and alias not in unique:
+            unique.append(alias)
+    return unique
+
+
+def expected_chinese_for_alias(japanese: str, chinese: str, alias: str) -> str:
+    normalized_japanese = normalize_glossary_key(japanese)
+    if alias == normalized_japanese:
+        return chinese
+
+    japanese_parts = [
+        part.strip()
+        for part in re.split(r"[・·･＝=]", normalized_japanese)
+        if part.strip()
+    ]
+    chinese_parts = [
+        part.strip()
+        for part in re.split(r"[·・＝=]", chinese)
+        if part.strip()
+    ]
+    if len(japanese_parts) == len(chinese_parts):
+        for index, part in enumerate(japanese_parts):
+            if alias == part:
+                return chinese_parts[index]
+    return chinese_parts[0] if chinese_parts else chinese
+
+
+def matched_glossary_terms(
+    source: str, terms: list[tuple[str, str]]
+) -> list[tuple[str, str, str, str]]:
+    normalized_source = normalize_glossary_key(source)
+    matched: list[tuple[str, str, str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for japanese, chinese in terms:
+        for alias in glossary_aliases(japanese):
+            if alias in normalized_source:
+                key = (japanese, chinese)
+                if key not in seen:
+                    expected = expected_chinese_for_alias(japanese, chinese, alias)
+                    matched.append((japanese, chinese, alias, expected))
+                    seen.add(key)
+                break
+    return matched
+
+
 def glossary_prompt(source: str, terms: list[tuple[str, str]], skills: list[str]) -> str:
-    relevant = [(jp, zh) for jp, zh in terms if jp in source]
-    lines = [f"{jp} => {zh}" for jp, zh in relevant]
+    relevant = matched_glossary_terms(source, terms)
+    lines = [
+        f"{alias} => {expected}"
+        + (f"（源文命中：{alias}）" if alias != normalize_glossary_key(jp) else "")
+        + (f"；完整译名：{jp} => {zh}" if expected != zh else "")
+        for jp, zh, alias, expected in relevant
+    ]
     if skills:
         lines.append("既有技能译名参考：" + "；".join(skills))
     return "\n".join(lines) if lines else "本页没有匹配到术语表条目。"
@@ -356,7 +425,11 @@ def request_vl_review(
         raise RuntimeError(f"Unexpected VL proofreading response: {json.dumps(result)}") from exc
 
 
-def invalid_translation_reason(text: str, source: str | None = None) -> str | None:
+def invalid_translation_reason(
+    text: str,
+    source: str | None = None,
+    terms: list[tuple[str, str]] | None = None,
+) -> str | None:
     stripped = text.strip()
     if not stripped:
         return "empty translation"
@@ -383,6 +456,13 @@ def invalid_translation_reason(text: str, source: str | None = None) -> str | No
     )
     if any(marker in stripped for marker in analysis_markers):
         return "analysis or explanation detected"
+    if source and terms:
+        for japanese, chinese, alias, expected in matched_glossary_terms(source, terms):
+            if expected not in stripped:
+                return (
+                    f"glossary term not applied: {alias} should be translated as "
+                    f"{expected}"
+                )
     if source and len(stripped) > max(1000, len(source) * 8):
         return (
             f"translation is too long relative to source "
@@ -423,7 +503,7 @@ def translate_with_retries(
             f"Translation request completed in "
             f"{format_elapsed(time.monotonic() - request_started)}"
         )
-        reason = invalid_translation_reason(text, source)
+        reason = invalid_translation_reason(text, source, terms)
         if not reason:
             return text.strip()
         last_reason = reason
@@ -448,7 +528,7 @@ def review_translation(
     started = time.monotonic()
     text = request_vl_review(image_path, source, draft, terms, skills, args, timeout)
     print(f"VL proofreading completed in {format_elapsed(time.monotonic() - started)}")
-    reason = invalid_translation_reason(text, source)
+    reason = invalid_translation_reason(text, source, terms)
     if reason:
         raise RuntimeError(f"VL proofreading produced invalid translation: {reason}")
     return text
@@ -597,7 +677,7 @@ def main() -> int:
                     print(f"Saved: {output_path}")
             elif args.resume and args.review_page is None and output_path.is_file():
                 text = output_path.read_text(encoding="utf-8").strip()
-                reason = invalid_translation_reason(text, source)
+                reason = invalid_translation_reason(text, source, terms)
                 if reason:
                     print(f"Redoing invalid translation: {output_path} ({reason})")
                     if not args.no_vl_review:
