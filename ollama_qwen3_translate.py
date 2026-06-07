@@ -1,13 +1,13 @@
 import argparse
 import base64
+import csv
 import json
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-
-from openpyxl import load_workbook
 
 from aigc2d_ocr import parse_combined_text, replace_combined_page
 
@@ -20,6 +20,8 @@ SYSTEM_PROMPT = """你是专业的日语漫画汉化翻译。
 纯假名的正文、助词、语气词、拟声词仍须正常翻译，不得因为没有汉字而忽略。
 不要逐行分析、解释翻译过程、复述要求或重复原文；将跨行组成的一句话合并为自然中文。
 输出前删除由注音造成的重复译文。例如相邻的“感想 / かんそう”只能输出一次“感想”。
+输出前逐字检查，最终译文不得残留任何平假名、片假名或未翻译的日语正文。
+所有括号和引号只能使用「」与『』；普通引用使用「」，嵌套引用或作品名使用『』。
 只在 JSON 的 translation 字段中输出最终中文译文。"""
 
 TRANSLATION_FORMAT = {
@@ -44,17 +46,38 @@ VL_REVIEW_PROMPT = """你是专业的漫画汉化校对。
 修正错译、漏译、人物语气和标点；严格沿用提供的术语表。
 初译与原文意思一致时不要擅自改变含义，只调整断句和表达。
 不要沿用 OCR 为适应竖排和气泡宽度产生的断行。每个对话框中的完整句子必须合并为一行。
-不同对话框、不同说话者、标题、拟声词之间使用换行或空行分隔，不要把整页合并成一段。
+不同对话框、不同说话者、标题、拟声词之间仅使用一个换行分隔，不得输出空白行，也不要把整页合并成一段。
 输出前逐段检查：如果某段中的连续行能够组成一句语法完整的话，必须删除这些行间换行。
 忽略普通注音，不要重复译文，不要添加解释、Markdown、页码或原文。
+必须翻译初译中残留的所有日语；最终结果不得包含任何平假名或片假名。
+所有括号和引号只能使用「」与『』；普通引用使用「」，嵌套引用或作品名使用『』。
 将标题、每个对话框和每个独立拟声词分别放入 JSON 的 segments 数组；每个数组元素内部不得换行。"""
+
+
+def format_elapsed(seconds: float) -> str:
+    minutes, remainder = divmod(seconds, 60)
+    hours, minutes = divmod(int(minutes), 60)
+    if hours:
+        return f"{hours:d}h {minutes:02d}m {remainder:04.1f}s"
+    if minutes:
+        return f"{minutes:d}m {remainder:04.1f}s"
+    return f"{remainder:.1f}s"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Translate page-marked Japanese OCR text with local Qwen3-30B-A3B."
     )
-    parser.add_argument("input", type=Path, help="Combined OCR text containing P{page} markers")
+    parser.add_argument(
+        "input",
+        type=Path,
+        help="Combined OCR text, or existing translation when using --vl-review-only",
+    )
+    parser.add_argument(
+        "--ocr-input",
+        type=Path,
+        help="OCR text for --vl-review-only (default: qwen3_ocr_text/INPUT_NAME)",
+    )
     parser.add_argument("--pages", help="Inclusive page range, for example 7-56")
     parser.add_argument(
         "--review-page",
@@ -62,17 +85,15 @@ def parse_args() -> argparse.Namespace:
         help="Redo one page and replace it in the existing --combined-output file",
     )
     parser.add_argument(
-        "--glossary", type=Path, default=Path("名词表.xlsx"), help="Excel glossary path"
+        "--glossary", type=Path, default=Path("名词表.csv"), help="CSV glossary path"
     )
-    parser.add_argument("--sheet", help="Glossary worksheet name (default: first sheet)")
     parser.add_argument(
         "--output-dir", type=Path, default=Path("translation_text"), help="Per-page output"
     )
     parser.add_argument(
         "--combined-output",
         type=Path,
-        default=Path("translation_text/pages_translated.txt"),
-        help="Combined translation path",
+        help="Combined translation path (default: translation_text/INPUT_NAME)",
     )
     parser.add_argument("--model", default="qwen3:30b", help="Ollama model name")
     parser.add_argument("--base-url", default="http://localhost:11434", help="Ollama URL")
@@ -100,7 +121,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--vl-review-only",
         action="store_true",
-        help="Proofread existing --combined-output translations without retranslating",
+        help="Proofread and update the existing translation INPUT in place",
     )
     parser.add_argument("--temperature", type=float, default=0.1)
     parser.add_argument("--num-predict", type=int, default=4096)
@@ -137,41 +158,27 @@ def filter_pages(pages: list[tuple[int, str]], page_range: str | None) -> list[t
     return selected
 
 
-def load_glossary(path: Path, sheet_name: str | None) -> tuple[list[tuple[str, str]], list[str]]:
+def load_glossary(path: Path) -> tuple[list[tuple[str, str]], list[str]]:
     if not path.is_file():
         raise FileNotFoundError(f"Glossary does not exist: {path}")
 
-    workbook = load_workbook(path, read_only=True, data_only=True)
-    sheet = workbook[sheet_name] if sheet_name else workbook.worksheets[0]
-    rows = list(sheet.iter_rows(values_only=True))
-
-    header_index = next(
-        (
-            index
-            for index, row in enumerate(rows)
-            if "日语名" in row and "中文名" in row
-        ),
-        None,
-    )
-    if header_index is None:
+    with path.open(encoding="utf-8-sig", newline="") as glossary_file:
+        rows = list(csv.DictReader(glossary_file))
+    if not rows or "日语名" not in rows[0] or "中文名" not in rows[0]:
         raise ValueError("Glossary must contain headers: 日语名 and 中文名")
-
-    headers = list(rows[header_index])
-    japanese_index = headers.index("日语名")
-    chinese_index = headers.index("中文名")
-    skills_index = headers.index("角色的技能名") if "角色的技能名" in headers else None
 
     terms: list[tuple[str, str]] = []
     skills: list[str] = []
-    for row in rows[header_index + 1 :]:
-        japanese = row[japanese_index] if japanese_index < len(row) else None
-        chinese = row[chinese_index] if chinese_index < len(row) else None
+    for row in rows:
+        japanese = row.get("日语名")
+        chinese = row.get("中文名")
         if japanese and chinese:
-            terms.append((str(japanese).strip(), str(chinese).strip()))
-        if skills_index is not None and skills_index < len(row) and row[skills_index]:
+            terms.append((japanese.strip(), chinese.strip()))
+        skill_text = row.get("角色的技能名")
+        if skill_text:
             skills.extend(
                 line.strip()
-                for line in str(row[skills_index]).splitlines()
+                for line in skill_text.splitlines()
                 if line.strip()
             )
     return terms, skills
@@ -191,6 +198,43 @@ def strip_thinking(text: str) -> str:
         closing_index = stripped.lower().rfind("</think>")
         return stripped[closing_index + len("</think>") :].strip()
     return re.sub(r"(?is)^\s*<think>.*?</think>\s*", "", stripped).strip()
+
+
+def normalize_brackets(text: str) -> str:
+    translation = str.maketrans(
+        {
+            "“": "「",
+            "”": "」",
+            "‘": "「",
+            "’": "」",
+            "(": "『",
+            ")": "』",
+            "（": "『",
+            "）": "』",
+            "[": "『",
+            "]": "』",
+            "【": "『",
+            "】": "』",
+            "《": "『",
+            "》": "』",
+            "〈": "『",
+            "〉": "』",
+            "{": "『",
+            "}": "』",
+            "｛": "『",
+            "｝": "』",
+            "<": "『",
+            ">": "』",
+        }
+    )
+    normalized = text.translate(translation)
+    parts = normalized.split('"')
+    if len(parts) == 1:
+        return normalized
+    return "".join(
+        part + ("「" if index % 2 == 0 else "」")
+        for index, part in enumerate(parts[:-1])
+    ) + parts[-1]
 
 
 def request_translation(
@@ -243,7 +287,7 @@ def request_translation(
         translated = json.loads(content)["translation"]
         if not isinstance(translated, str):
             raise TypeError("translation is not a string")
-        return translated.strip()
+        return normalize_brackets(translated.strip())
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
         raise RuntimeError(f"Unexpected Ollama response: {json.dumps(result)}") from exc
 
@@ -255,6 +299,7 @@ def request_vl_review(
     terms: list[tuple[str, str]],
     skills: list[str],
     args: argparse.Namespace,
+    request_timeout: int,
 ) -> str:
     prompt = (
         f"/no_think\n术语表：\n{glossary_prompt(source, terms, skills)}\n\n"
@@ -282,7 +327,7 @@ def request_vl_review(
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=args.request_timeout) as response:
+        with urllib.request.urlopen(request, timeout=request_timeout) as response:
             result = json.load(response)
     except urllib.error.HTTPError as exc:
         details = exc.read().decode("utf-8", errors="replace")
@@ -291,7 +336,7 @@ def request_vl_review(
         raise RuntimeError(f"Could not connect to VL proofreading Ollama: {exc.reason}") from exc
     except TimeoutError as exc:
         raise RuntimeError(
-            f"VL proofreading request timed out after {args.request_timeout} seconds"
+            f"VL proofreading request timed out after {request_timeout} seconds"
         ) from exc
 
     try:
@@ -306,7 +351,7 @@ def request_vl_review(
             for segment in segments
             if segment.strip()
         ]
-        return "\n\n".join(cleaned)
+        return normalize_brackets("\n".join(cleaned))
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
         raise RuntimeError(f"Unexpected VL proofreading response: {json.dumps(result)}") from exc
 
@@ -319,6 +364,14 @@ def invalid_translation_reason(text: str, source: str | None = None) -> str | No
         return "thinking output detected"
     if re.search(r"(?m)^P\d+\s*$", stripped):
         return "unexpected page marker detected"
+    japanese_match = re.search(r"[\u3040-\u30ff\uff66-\uff9f]", stripped)
+    if japanese_match:
+        return f"untranslated Japanese kana detected: {japanese_match.group(0)}"
+    disallowed_bracket = re.search(
+        r'["“”‘’()（）\[\]【】《》〈〉{}｛｝<>]', stripped
+    )
+    if disallowed_bracket:
+        return f"disallowed bracket detected: {disallowed_bracket.group(0)}"
     analysis_markers = (
         "首先，用户要求",
         "我需要翻译",
@@ -345,9 +398,17 @@ def translate_with_retries(
     terms: list[tuple[str, str]],
     skills: list[str],
     args: argparse.Namespace,
+    deadline: float | None = None,
 ) -> str:
     last_reason = "unknown invalid translation"
+    deadline = deadline or time.monotonic() + args.request_timeout
     for attempt in range(1, args.retries + 1):
+        remaining = int(deadline - time.monotonic())
+        if remaining < 1:
+            raise RuntimeError(
+                f"Translation page timed out after {args.request_timeout} seconds"
+            )
+        request_started = time.monotonic()
         text = request_translation(
             source,
             terms,
@@ -356,7 +417,11 @@ def translate_with_retries(
             args.base_url,
             args.temperature,
             args.num_predict,
-            args.request_timeout,
+            remaining,
+        )
+        print(
+            f"Translation request completed in "
+            f"{format_elapsed(time.monotonic() - request_started)}"
         )
         reason = invalid_translation_reason(text, source)
         if not reason:
@@ -373,16 +438,65 @@ def review_translation(
     terms: list[tuple[str, str]],
     skills: list[str],
     args: argparse.Namespace,
+    request_timeout: int | None = None,
 ) -> str:
     image_path = args.image_dir / f"page_{page:04d}.jpg"
     if not image_path.is_file():
         raise FileNotFoundError(f"VL proofreading image does not exist: {image_path}")
+    timeout = request_timeout if request_timeout is not None else args.request_timeout
     print(f"VL proofreading P{page}")
-    text = request_vl_review(image_path, source, draft, terms, skills, args)
+    started = time.monotonic()
+    text = request_vl_review(image_path, source, draft, terms, skills, args, timeout)
+    print(f"VL proofreading completed in {format_elapsed(time.monotonic() - started)}")
     reason = invalid_translation_reason(text, source)
     if reason:
         raise RuntimeError(f"VL proofreading produced invalid translation: {reason}")
     return text
+
+
+def translate_and_review(
+    page: int,
+    source: str,
+    initial_draft: str | None,
+    terms: list[tuple[str, str]],
+    skills: list[str],
+    args: argparse.Namespace,
+) -> str:
+    deadline = time.monotonic() + args.request_timeout
+    draft = initial_draft
+    last_error = "unknown proofreading failure"
+    for attempt in range(1, args.retries + 1):
+        remaining = int(deadline - time.monotonic())
+        if remaining < 1:
+            raise RuntimeError(
+                f"Translation and VL proofreading page timed out after "
+                f"{args.request_timeout} seconds"
+            )
+        if draft is None:
+            print(f"Retranslating P{page} before VL proofreading ({attempt}/{args.retries})")
+            draft = translate_with_retries(source, terms, skills, args, deadline=deadline)
+        remaining = int(deadline - time.monotonic())
+        if remaining < 1:
+            raise RuntimeError(
+                f"Translation and VL proofreading page timed out after "
+                f"{args.request_timeout} seconds"
+            )
+        try:
+            return review_translation(
+                page, source, draft, terms, skills, args, request_timeout=remaining
+            )
+        except RuntimeError as exc:
+            last_error = str(exc)
+            print(
+                f"VL proofreading failed ({attempt}/{args.retries}); "
+                f"will retranslate: {exc}",
+                file=sys.stderr,
+            )
+            draft = None
+    raise RuntimeError(
+        f"Translation and VL proofreading failed after {args.retries} attempts: "
+        f"{last_error}"
+    )
 
 
 def write_combined(path: Path, translations: list[tuple[int, str]]) -> None:
@@ -393,8 +507,25 @@ def write_combined(path: Path, translations: list[tuple[int, str]]) -> None:
 
 def main() -> int:
     args = parse_args()
+    task_started = time.monotonic()
     try:
-        input_pages = parse_combined_text(args.input.read_text(encoding="utf-8"))
+        if args.vl_review_only:
+            if args.combined_output and args.combined_output.resolve() != args.input.resolve():
+                raise ValueError(
+                    "--vl-review-only updates INPUT in place; do not use "
+                    "--combined-output for a different file"
+                )
+            args.combined_output = args.input
+            source_path = args.ocr_input or Path("qwen3_ocr_text") / args.input.name
+        else:
+            if args.ocr_input:
+                raise ValueError("--ocr-input can only be used with --vl-review-only")
+            source_path = args.input
+            args.combined_output = (
+                args.combined_output or Path("translation_text") / args.input.name
+            )
+
+        input_pages = parse_combined_text(source_path.read_text(encoding="utf-8"))
         if args.review_page is not None:
             if args.review_page < 1:
                 raise ValueError("--review-page must be greater than zero")
@@ -406,10 +537,10 @@ def main() -> int:
                 )
             pages = [(page, text) for page, text in input_pages if page == args.review_page]
             if not pages:
-                raise ValueError(f"Input does not contain P{args.review_page}: {args.input}")
+                raise ValueError(f"Input does not contain P{args.review_page}: {source_path}")
         else:
             pages = filter_pages(input_pages, args.pages)
-        terms, skills = load_glossary(args.glossary, args.sheet)
+        terms, skills = load_glossary(args.glossary)
         print(
             f"Selected {len(pages)} page(s): P{pages[0][0]} through P{pages[-1][0]}; "
             f"loaded {len(terms)} term mapping(s)"
@@ -449,11 +580,17 @@ def main() -> int:
         args.output_dir.mkdir(parents=True, exist_ok=True)
         translations = []
         for page, source in pages:
+            page_started = time.monotonic()
             output_path = args.output_dir / f"page_{page:04d}.txt"
             if args.vl_review_only:
                 print(f"VL proofreading existing P{page}")
-                text = review_translation(
-                    page, source, existing_translations[page], terms, skills, args
+                text = translate_and_review(
+                    page,
+                    source,
+                    existing_translations[page],
+                    terms,
+                    skills,
+                    args,
                 )
                 if args.keep_page_files:
                     output_path.write_text(text + "\n", encoding="utf-8")
@@ -463,17 +600,19 @@ def main() -> int:
                 reason = invalid_translation_reason(text, source)
                 if reason:
                     print(f"Redoing invalid translation: {output_path} ({reason})")
-                    text = translate_with_retries(source, terms, skills, args)
                     if not args.no_vl_review:
-                        text = review_translation(page, source, text, terms, skills, args)
+                        text = translate_and_review(page, source, None, terms, skills, args)
+                    else:
+                        text = translate_with_retries(source, terms, skills, args)
                     output_path.write_text(text + "\n", encoding="utf-8")
                 else:
                     print(f"Reused: {output_path}")
             else:
                 print(f"Translating P{page}")
-                text = translate_with_retries(source, terms, skills, args)
                 if not args.no_vl_review:
-                    text = review_translation(page, source, text, terms, skills, args)
+                    text = translate_and_review(page, source, None, terms, skills, args)
+                else:
+                    text = translate_with_retries(source, terms, skills, args)
                 output_path.write_text(text + "\n", encoding="utf-8")
                 print(f"Saved: {output_path}")
 
@@ -492,6 +631,7 @@ def main() -> int:
                 print(f"Updated P{page} in combined translation")
             elif args.review_page is None:
                 write_combined(args.combined_output, translations)
+            print(f"P{page} completed in {format_elapsed(time.monotonic() - page_started)}")
 
         if args.review_page is not None:
             replace_combined_page(args.combined_output, args.review_page, translations[0][1])
@@ -505,6 +645,7 @@ def main() -> int:
             for page, _ in pages:
                 (args.output_dir / f"page_{page:04d}.txt").unlink(missing_ok=True)
             print(f"Deleted {len(pages)} per-page intermediate translation file(s)")
+        print(f"Total elapsed: {format_elapsed(time.monotonic() - task_started)}")
     except (OSError, RuntimeError, ValueError, KeyError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
