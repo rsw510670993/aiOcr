@@ -10,6 +10,7 @@ from pathlib import Path
 from aigc2d_ocr import (
     combined_output_path,
     page_number,
+    replace_combined_page,
     select_images,
     write_combined_text,
 )
@@ -30,6 +31,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image-dir", type=Path, help="Directory containing page_NNNN.jpg")
     parser.add_argument("--pages", help="Inclusive page range, for example 7-56")
     parser.add_argument(
+        "--review-page",
+        type=int,
+        help="Redo one page and replace it in the existing --combined-output file",
+    )
+    parser.add_argument(
         "--model", default="qwen3-vl:30b-a3b-instruct", help="Ollama model name"
     )
     parser.add_argument(
@@ -44,6 +50,11 @@ def parse_args() -> argparse.Namespace:
         "--resume",
         action="store_true",
         help="Reuse existing per-page text files and continue missing pages",
+    )
+    parser.add_argument(
+        "--keep-page-files",
+        action="store_true",
+        help="Keep per-page text files after the combined output is complete",
     )
     parser.add_argument(
         "--dry-run", action="store_true", help="List selected images without calling Ollama"
@@ -133,7 +144,16 @@ def request_valid_ocr(
 def main() -> int:
     args = parse_args()
     try:
-        images = select_images(args)
+        if args.review_page is not None:
+            if args.review_page < 1:
+                raise ValueError("--review-page must be greater than zero")
+            if not args.image_dir or not args.combined_output:
+                raise ValueError("--review-page requires --image-dir and --combined-output")
+            if args.pages or args.images:
+                raise ValueError("--review-page cannot be combined with --pages or image paths")
+            images = [args.image_dir / f"page_{args.review_page:04d}.jpg"]
+        else:
+            images = select_images(args)
         for image_path in images:
             if not image_path.is_file():
                 raise FileNotFoundError(f"Image does not exist: {image_path}")
@@ -150,7 +170,7 @@ def main() -> int:
         combined_pages = []
         for image_path in images:
             output_path = args.output / f"{image_path.stem}.txt"
-            if args.resume and output_path.is_file():
+            if args.resume and args.review_page is None and output_path.is_file():
                 text = output_path.read_text(encoding="utf-8").strip()
                 reason = invalid_output_reason(text)
                 if reason:
@@ -181,9 +201,19 @@ def main() -> int:
                 print(f"Saved: {output_path}")
 
             combined_pages.append((page_number(image_path), text))
-            write_combined_text(combined_path, combined_pages)
+            if args.review_page is None:
+                write_combined_text(combined_path, combined_pages)
 
-        print(f"Saved combined text: {combined_path}")
+        if args.review_page is not None:
+            replace_combined_page(combined_path, args.review_page, combined_pages[0][1])
+            print(f"Replaced P{args.review_page} in combined text: {combined_path}")
+        else:
+            print(f"Saved combined text: {combined_path}")
+        if not args.keep_page_files:
+            for image_path in images:
+                output_path = args.output / f"{image_path.stem}.txt"
+                output_path.unlink(missing_ok=True)
+            print(f"Deleted {len(images)} per-page intermediate text file(s)")
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

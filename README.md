@@ -13,6 +13,7 @@ OCR 阅读顺序为从上到下、从右到左。普通且与正文汉字发音�
 - Ollama
 - NVIDIA RTX 3080 Ti 12GB 或相近配置
 - Ollama 模型：`qwen3-vl:30b-a3b-instruct`
+- 翻译模型：`qwen3:30b`
 
 创建 Python 虚拟环境并安装依赖：
 
@@ -25,6 +26,7 @@ python -m venv .venv
 
 ```powershell
 ollama pull qwen3-vl:30b-a3b-instruct
+ollama pull qwen3:30b
 ```
 
 ## 启动 Ollama
@@ -62,9 +64,20 @@ ollama serve
 
 输出内容：
 
-- 每页文本：`qwen3_ocr_text/page_0007.txt`
 - 合并文本：`qwen3_ocr_text/pages_0007-0056.txt`
 - 合并文件每页以 `P{页码}` 开头，页面之间包含一个空行
+- 每页文本用于中断恢复，全部识别完成后默认自动删除
+
+需要保留每页文本时添加 `--keep-page-files`。
+
+重新校对某一页并原位更新现有合并 OCR 文件：
+
+```powershell
+.\.venv\Scripts\python.exe .\ollama_qwen3_vl_ocr.py `
+  --image-dir .\exported_jpg `
+  --review-page 8 `
+  --combined-output .\qwen3_ocr_text\pages_0007-0056.txt
+```
 
 ## 断点续传
 
@@ -99,11 +112,74 @@ ollama serve
 
 ```text
 --pages 7-56             指定包含首尾页的页码范围
+--review-page 8          重做指定页并替换现有合并文件中的该页
 --resume                 复用正常结果，继续缺失或异常页面
+--keep-page-files        完成后保留每页 OCR 中间文本
 --retries 3              异常输出重试次数
 --temperature 0.0        控制输出随机性
 --num-predict 2048       单页最大输出 token 数
 --base-url URL           Ollama API 地址
 --combined-output PATH   指定合并文本路径
 --dry-run                仅检查选中的图片，不执行 OCR
+```
+
+## 使用 Qwen3 翻译
+
+翻译工具读取带有 `P{页码}` 标记的合并 OCR 文本，并按页调用本地
+`qwen3:30b`。每页初译完成后，默认调用一次 `qwen3-vl:30b-a3b-instruct`
+结合对应漫画图片进行校对，将同一句中的散乱断行合并，同时保留不同气泡之间的分段。
+关键名词从 Excel 术语表读取；工作表中须包含 `日语名` 和 `中文名`
+两列，可选的 `角色的技能名` 列会作为已有译名参考。
+
+先检查页码和术语匹配情况，不调用模型：
+
+```powershell
+.\.venv\Scripts\python.exe .\ollama_qwen3_translate.py `
+  .\qwen3_ocr_text\pages_0007-0056.txt `
+  --glossary .\名词表.xlsx `
+  --pages 7-56 `
+  --dry-run
+```
+
+翻译第 7 至 56 页：
+
+```powershell
+.\.venv\Scripts\python.exe .\ollama_qwen3_translate.py `
+  .\qwen3_ocr_text\pages_0007-0056.txt `
+  --glossary .\名词表.xlsx `
+  --pages 7-56 `
+  --image-dir .\exported_jpg `
+  --combined-output .\translation_text\pages_0007-0056.txt
+```
+
+每页译文在处理中用于断点恢复，成功生成合并译文后默认自动删除。
+添加 `--keep-page-files` 可保留逐页译文；中断后添加 `--resume` 可复用已有结果。
+不需要图片校对时添加 `--no-vl-review`。可通过 `--vl-model` 和
+`--vl-base-url` 指定校对模型及 Ollama 服务地址。
+每次单页文本翻译或 VL 校对默认最多等待 300 秒，可通过
+`--request-timeout` 调整。
+
+仅使用 VL 对现有合并译文进行批量校对，不重新运行文本初译：
+
+```powershell
+.\.venv\Scripts\python.exe .\ollama_qwen3_translate.py `
+  .\qwen3_ocr_text\pages_0007-0056.txt `
+  --glossary .\名词表.xlsx `
+  --pages 7-56 `
+  --image-dir .\exported_jpg `
+  --vl-review-only `
+  --combined-output .\translation_text\pages_0007-0056.txt
+```
+
+VL 批量校对会在每页完成后立即更新合并译文，并默认删除该页中间文件；
+因此后续页面超时或任务中断时，已完成页面也不会残留逐页文本。
+
+重新翻译某一页并原位更新现有合并译文：
+
+```powershell
+.\.venv\Scripts\python.exe .\ollama_qwen3_translate.py `
+  .\qwen3_ocr_text\pages_0007-0056.txt `
+  --glossary .\名词表.xlsx `
+  --review-page 8 `
+  --combined-output .\translation_text\pages_0007-0056.txt
 ```

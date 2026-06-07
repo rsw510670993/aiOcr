@@ -93,6 +93,29 @@ def format_combined_text(pages: list[tuple[int, str]]) -> str:
     return "\n\n".join(f"P{number}\n{text.strip()}" for number, text in pages) + "\n"
 
 
+def parse_combined_text(text: str) -> list[tuple[int, str]]:
+    matches = list(re.finditer(r"(?m)^P(\d+)\s*$", text))
+    if not matches:
+        raise ValueError("Combined file does not contain P{page} markers")
+
+    pages = []
+    for index, match in enumerate(matches):
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        pages.append((int(match.group(1)), text[start:end].strip()))
+    return pages
+
+
+def replace_combined_page(path: Path, page: int, text: str) -> None:
+    if not path.is_file():
+        raise FileNotFoundError(f"Combined file does not exist: {path}")
+    pages = parse_combined_text(path.read_text(encoding="utf-8"))
+    if page not in {number for number, _ in pages}:
+        raise ValueError(f"Combined file does not contain P{page}: {path}")
+    updated = [(number, text if number == page else content) for number, content in pages]
+    write_combined_text(path, updated)
+
+
 def write_combined_text(path: Path, pages: list[tuple[int, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(format_combined_text(pages), encoding="utf-8")
