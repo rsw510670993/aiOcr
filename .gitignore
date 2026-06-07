@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.key
+*.pdf
+exported_jpg/
+ocr_text/
+qwen3_ocr_text/
