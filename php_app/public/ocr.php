@@ -90,55 +90,6 @@ if ($defaultImageDir !== '' && !in_array($defaultImageDir, $imageDirChoices, tru
 
 render_page('OCR 识别', function () use ($error, $job, $imageDirChoices, $defaultImageDir, $defaultCombinedName): void {
 ?>
-<section class="grid two">
-    <div class="panel">
-        <h2>提交 OCR 任务</h2>
-        <?php if ($error !== '') : ?>
-            <div class="alert error"><?= e($error) ?></div>
-        <?php endif; ?>
-        <form method="post">
-            <label>图片目录
-                <input type="text" name="image_dir" list="image-dir-options" value="<?= e($defaultImageDir) ?>" placeholder="例如：/workspace/php_app/runtime/workspaces/.../exported_jpg" required>
-                <datalist id="image-dir-options">
-                    <?php foreach ($imageDirChoices as $path) : ?>
-                        <option value="<?= e($path) ?>"></option>
-                    <?php endforeach; ?>
-                </datalist>
-            </label>
-            <label>页码范围
-                <input type="text" name="pages" value="1-1" placeholder="例如：7-56" required>
-            </label>
-            <label>合并输出文件名
-                <input type="text" name="combined_name" value="<?= e($defaultCombinedName) ?>">
-            </label>
-            <div class="inline-fields">
-                <label>模型名
-                    <input type="text" name="model" value="gemini-3.1-flash-lite">
-                </label>
-                <label>超时秒数
-                    <input type="number" name="request_timeout" min="30" value="300">
-                </label>
-                <label>重试次数
-                    <input type="number" name="retries" min="1" value="3">
-                </label>
-            </div>
-            <div class="checkbox-list">
-                <label><input type="checkbox" name="resume" value="1"> 断点续传</label>
-                <label><input type="checkbox" name="no_consistency_check" value="1"> 跳过一致性检查</label>
-            </div>
-            <button type="submit">启动 OCR</button>
-        </form>
-    </div>
-    <div class="panel">
-        <h2>说明</h2>
-        <ul class="list-reset">
-            <li>只接入 `aigc2d_ocr.py`。</li>
-            <li>输出文件保存到当前 OCR 任务自己的 `ocr_text/` 工作区。</li>
-            <li>成功后可直接跳转到翻译页。</li>
-        </ul>
-    </div>
-</section>
-
 <?php if ($job) : ?>
     <section class="panel" data-job-status data-job-id="<?= e((string) $job['id']) ?>" data-status-url="<?= e(url('jobStatus.php')) ?>">
         <h2>OCR 任务状态</h2>
@@ -165,10 +116,49 @@ render_page('OCR 识别', function () use ($error, $job, $imageDirChoices, $defa
             </div>
             <div>
                 <h3>日志</h3>
-                <pre data-field="log"><?= e(tail_file((string) $job['log_file'], (int) app_config('max_log_bytes'))) ?></pre>
+                <pre class="console-log" data-field="log"><?= e(tail_file((string) $job['log_file'], (int) app_config('max_log_bytes'))) ?></pre>
             </div>
         </div>
     </section>
 <?php endif; ?>
+
+<section class="panel">
+    <h2>提交 OCR 任务</h2>
+    <?php if ($error !== '') : ?>
+        <div class="alert error"><?= e($error) ?></div>
+    <?php endif; ?>
+    <form method="post">
+        <label>图片目录
+            <input type="text" name="image_dir" list="image-dir-options" value="<?= e($defaultImageDir) ?>" placeholder="例如：php_app/runtime/workspaces/.../exported_jpg" required>
+            <datalist id="image-dir-options">
+                <?php foreach ($imageDirChoices as $path) : ?>
+                    <option value="<?= e($path) ?>"></option>
+                <?php endforeach; ?>
+            </datalist>
+        </label>
+        <label>页码范围
+            <input type="text" name="pages" value="1-1" placeholder="例如：7-56" required>
+        </label>
+        <label>合并输出文件名
+            <input type="text" name="combined_name" value="<?= e($defaultCombinedName) ?>">
+        </label>
+        <div class="inline-fields">
+            <label>模型名
+                <input type="text" name="model" value="gemini-3.1-flash-lite">
+            </label>
+            <label>超时秒数
+                <input type="number" name="request_timeout" min="30" value="300">
+            </label>
+            <label>重试次数
+                <input type="number" name="retries" min="1" value="3">
+            </label>
+        </div>
+        <div class="checkbox-list">
+            <label><input type="checkbox" name="resume" value="1"> 断点续传</label>
+            <label><input type="checkbox" name="no_consistency_check" value="1"> 跳过一致性检查</label>
+        </div>
+        <button type="submit">启动 OCR</button>
+    </form>
+</section>
 <?php
 });
