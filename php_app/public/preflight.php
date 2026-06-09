@@ -103,7 +103,7 @@ $projectsRoot = (string) app_config('projects_dir');
             <div class="alert <?= $allReady ? 'success' : 'error' ?>">
                 <?= $allReady ? '环境已满足当前 PHP 小站运行条件。' : '仍有缺失项，建议先修复后再运行 OCR / 翻译任务。' ?>
             </div>
-            <table>
+            <table class="preflight-table">
                 <thead>
                 <tr>
                     <th>检查项</th>
