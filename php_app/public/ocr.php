@@ -88,7 +88,7 @@ if ($defaultImageDir !== '' && !in_array($defaultImageDir, $imageDirChoices, tru
     array_unshift($imageDirChoices, $defaultImageDir);
 }
 
-render_page('OCR 识别', function () use ($error, $job, $imageDirChoices, $defaultImageDir): void {
+render_page('OCR 识别', function () use ($error, $job, $imageDirChoices, $defaultImageDir, $defaultCombinedName): void {
 ?>
 <section class="grid two">
     <div class="panel">
