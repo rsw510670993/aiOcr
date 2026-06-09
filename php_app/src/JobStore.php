@@ -10,7 +10,9 @@ final class JobStore
     public function __construct(private readonly string $jobsDir)
     {
         if (!is_dir($this->jobsDir)) {
-            mkdir($this->jobsDir, 0775, true);
+            if (!@mkdir($this->jobsDir, 0775, true) && !is_dir($this->jobsDir)) {
+                throw new RuntimeException('无法创建任务目录：' . $this->jobsDir);
+            }
         }
     }
 
