@@ -76,7 +76,7 @@
     completedPages: new Set(payload.completed_pages || []),
     index: 0,
     saveUrl: payload.save_url,
-    jobId: payload.job_id,
+    projectId: payload.project_id,
     translationPath: payload.translation_path,
   };
 
@@ -128,7 +128,7 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
-        job_id: state.jobId,
+        project_id: state.projectId,
         translation_path: state.translationPath,
         completed_pages: Array.from(state.completedPages),
         pages: state.pages.map((page) => ({ page: page.page, text: page.proofread_text || '' })),

@@ -5,8 +5,10 @@ namespace App;
 
 final class ArtifactLocator
 {
-    public function __construct(private readonly JobStore $jobStore)
-    {
+    public function __construct(
+        private readonly JobStore $jobStore,
+        private readonly WorkspaceManager $workspaceManager,
+    ) {
     }
 
     /** @return list<array<string, mixed>> */
@@ -47,5 +49,30 @@ final class ArtifactLocator
             return null;
         }
         return $job['artifacts'] ?? [];
+    }
+
+    /** @return list<array{id:string,path:string,updated_at:int}> */
+    public function recentProjects(int $limit = 20): array
+    {
+        return $this->workspaceManager->listProjects($limit);
+    }
+
+    /** @return list<string> */
+    public function projectFiles(string $projectId, string $folder): array
+    {
+        return $this->workspaceManager->textFiles($projectId, $folder);
+    }
+
+    /** @return array<string, string>|null */
+    public function projectArtifacts(?string $projectId): ?array
+    {
+        if (!$projectId) {
+            return null;
+        }
+        try {
+            return $this->workspaceManager->existingProjectPaths($projectId);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

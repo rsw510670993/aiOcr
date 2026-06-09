@@ -3,6 +3,7 @@ __pycache__/
 *.key
 *.pdf
 php_app/runtime/
+projects/
 exported_jpg/
 ocr_text/
 qwen3_ocr_text/

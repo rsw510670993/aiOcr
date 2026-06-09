@@ -10,36 +10,44 @@ use App\PathGuard;
 use App\ProofreadStore;
 use App\WorkspaceManager;
 
+$workspaceManager = new WorkspaceManager();
 $jobStore = new JobStore((string) app_config('jobs_dir'));
-$locator = new ArtifactLocator($jobStore);
+$locator = new ArtifactLocator($jobStore, $workspaceManager);
 $guard = new PathGuard();
 $parser = new CombinedTextParser();
-$proofreadStore = new ProofreadStore(new WorkspaceManager(), $parser);
+$proofreadStore = new ProofreadStore($workspaceManager, $parser);
 
 $error = '';
-$jobId = get_string('job_id');
-$imageDir = get_string('image_dir');
+$projectId = get_string('project_id');
 $ocrPath = get_string('ocr_path');
 $translationPath = get_string('translation_path');
-$recentTranslateJobs = $locator->recentJobs('translate');
-$imageChoices = $locator->recentArtifactPaths('exported_jpg');
-$ocrChoices = $locator->recentArtifactPaths('ocr_text');
-$translationChoices = $locator->recentArtifactPaths('translation_text');
+$projectChoices = $locator->recentProjects(20);
+$proofreadPayload = null;
+$project = null;
+$ocrChoices = [];
+$translationChoices = [];
 
-if ($jobId !== '') {
-    $linked = $locator->linkedArtifacts($jobId) ?? [];
-    $imageDir = $imageDir !== '' ? $imageDir : (string) ($linked['image_dir'] ?? '');
-    $ocrPath = $ocrPath !== '' ? $ocrPath : (string) ($linked['ocr_text'] ?? '');
-    $translationPath = $translationPath !== '' ? $translationPath : (string) ($linked['translation_text'] ?? '');
+if ($projectId !== '') {
+    $projectId = $workspaceManager->projectIdFromName($projectId);
+    $project = $locator->projectArtifacts($projectId);
+    if ($project) {
+        $ocrChoices = $locator->projectFiles($projectId, 'ocr_text');
+        $translationChoices = $locator->projectFiles($projectId, 'aigc2d_translation_text');
+        if ($ocrPath === '' && $ocrChoices !== []) {
+            $ocrPath = $ocrChoices[0];
+        }
+        if ($translationPath === '' && $translationChoices !== []) {
+            $translationPath = $translationChoices[0];
+        }
+    }
 }
 
-$proofreadPayload = null;
-if ($jobId !== '' || ($imageDir !== '' && $ocrPath !== '' && $translationPath !== '')) {
+if ($projectId !== '' && $ocrPath !== '' && $translationPath !== '') {
     try {
-        if ($jobId === '') {
-            throw new RuntimeException('校对页保存需要 job_id，请从翻译任务跳转或手动填写 job_id。');
+        if (!$project) {
+            throw new RuntimeException('项目不存在：' . $projectId);
         }
-        $imageDir = $guard->assertDir($imageDir);
+        $imageDir = $guard->assertDir($project['exported_jpg']);
         $ocrPath = $guard->assertFile($ocrPath);
         $translationPath = $guard->assertFile($translationPath);
 
@@ -61,7 +69,7 @@ if ($jobId !== '' || ($imageDir !== '' && $ocrPath !== '' && $translationPath !=
             throw new RuntimeException('OCR 与翻译文件页码不一致，无法进入校对。');
         }
 
-        $bundle = $proofreadStore->loadBundle($jobId, $translationPath);
+        $bundle = $proofreadStore->loadBundle($projectId, $translationPath);
         $proofreadMap = [];
         foreach ($bundle['pages'] as $page) {
             $proofreadMap[$page['page']] = $page['text'];
@@ -83,7 +91,8 @@ if ($jobId !== '' || ($imageDir !== '' && $ocrPath !== '' && $translationPath !=
         }
 
         $proofreadPayload = [
-            'job_id' => $jobId,
+            'project_id' => $projectId,
+            'project_root' => $project['root'],
             'image_dir' => $imageDir,
             'ocr_path' => $ocrPath,
             'translation_path' => $translationPath,
@@ -97,7 +106,7 @@ if ($jobId !== '' || ($imageDir !== '' && $ocrPath !== '' && $translationPath !=
     }
 }
 
-render_page('校对', function () use ($error, $jobId, $imageDir, $ocrPath, $translationPath, $recentTranslateJobs, $imageChoices, $ocrChoices, $translationChoices, $proofreadPayload): void {
+render_page('校对', function () use ($error, $projectId, $ocrPath, $translationPath, $projectChoices, $ocrChoices, $translationChoices, $proofreadPayload): void {
 ?>
 <section class="panel">
     <h2>加载校对数据</h2>
@@ -105,24 +114,14 @@ render_page('校对', function () use ($error, $jobId, $imageDir, $ocrPath, $tra
         <div class="alert error"><?= e($error) ?></div>
     <?php endif; ?>
     <form method="get">
-        <div class="inline-fields">
-            <label>翻译任务 ID
-                <input type="text" name="job_id" list="job-id-options" value="<?= e($jobId) ?>" placeholder="优先推荐填写，以便自动联动保存路径">
-                <datalist id="job-id-options">
-                    <?php foreach ($recentTranslateJobs as $job) : ?>
-                        <option value="<?= e((string) $job['id']) ?>"></option>
-                    <?php endforeach; ?>
-                </datalist>
-            </label>
-            <label>图片目录
-                <input type="text" name="image_dir" list="image-dir-options" value="<?= e($imageDir) ?>">
-                <datalist id="image-dir-options">
-                    <?php foreach ($imageChoices as $path) : ?>
-                        <option value="<?= e($path) ?>"></option>
-                    <?php endforeach; ?>
-                </datalist>
-            </label>
-        </div>
+        <label>项目 ID
+            <input type="text" name="project_id" list="project-id-options" value="<?= e($projectId) ?>" placeholder="例如：book_01" required>
+            <datalist id="project-id-options">
+                <?php foreach ($projectChoices as $item) : ?>
+                    <option value="<?= e($item['id']) ?>"></option>
+                <?php endforeach; ?>
+            </datalist>
+        </label>
         <div class="inline-fields">
             <label>OCR 合并文件
                 <input type="text" name="ocr_path" list="ocr-path-options" value="<?= e($ocrPath) ?>">
@@ -149,7 +148,7 @@ render_page('校对', function () use ($error, $jobId, $imageDir, $ocrPath, $tra
     <section class="panel">
         <h2>当前校对稿</h2>
         <div class="proofread-meta">
-            <span>任务 ID：<code><?= e($proofreadPayload['job_id']) ?></code></span>
+            <span>项目：<code><?= e($proofreadPayload['project_id']) ?></code></span>
             <span>OCR：<code><?= e(relative_project_path($proofreadPayload['ocr_path'])) ?></code></span>
             <span>译文：<code><?= e(relative_project_path($proofreadPayload['translation_path'])) ?></code></span>
             <span>校对稿：<code><?= e(relative_project_path($proofreadPayload['proofread_path'])) ?></code></span>

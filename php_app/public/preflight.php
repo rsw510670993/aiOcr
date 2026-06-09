@@ -6,6 +6,7 @@
         $pythonBin = (string) app_config('python_bin');
         $runtimeRoot = (string) app_config('runtime_root');
         $projectRoot = (string) app_config('project_root');
+$projectsRoot = (string) app_config('projects_dir');
 
         $checkCommand = static function (string $command): array {
             $output = [];
@@ -47,7 +48,7 @@
                 'name' => '.venv 目录',
                 'ok' => is_dir($projectRoot . '/.venv'),
                 'detail' => is_dir($projectRoot . '/.venv') ? '已存在' : '缺失',
-                'hint' => '执行 `python3 -m venv /workspace/.venv`。',
+                'hint' => '执行 `python3 -m venv ' . $projectRoot . '/.venv`。',
             ],
             [
                 'name' => '.venv/bin/python',
@@ -65,13 +66,13 @@
                 'name' => 'aigc2d.key',
                 'ok' => is_file($projectRoot . '/aigc2d.key') && trim((string) @file_get_contents($projectRoot . '/aigc2d.key')) !== '',
                 'detail' => is_file($projectRoot . '/aigc2d.key') ? '已找到' : '缺失',
-                'hint' => '将 API Key 保存到 `/workspace/aigc2d.key`。',
+                'hint' => '将 API Key 保存到 `' . $projectRoot . '/aigc2d.key`。',
             ],
             [
                 'name' => '名词表.csv',
                 'ok' => is_file($projectRoot . '/名词表.csv'),
                 'detail' => is_file($projectRoot . '/名词表.csv') ? '已找到' : '缺失',
-                'hint' => '翻译页默认读取 `/workspace/名词表.csv`。',
+                'hint' => '翻译页默认读取 `' . $projectRoot . '/名词表.csv`。',
             ],
             [
                 'name' => 'runtime 可写',
@@ -80,10 +81,16 @@
                 'hint' => '确认 PHP 进程对 `php_app/runtime` 有写权限。',
             ],
             [
+                'name' => 'projects 可写',
+                'ok' => (is_dir($projectsRoot) && is_writable($projectsRoot)) || (is_dir($projectRoot) && is_writable($projectRoot)),
+                'detail' => $projectsRoot,
+                'hint' => '创建项目时需要能在工程根目录下写入 `projects/`。',
+            ],
+            [
                 'name' => 'PyMuPDF 可导入',
                 'ok' => $pymupdfReady,
                 'detail' => $pymupdfOutput !== '' ? $pymupdfOutput : '导入失败',
-                'hint' => '执行 `/workspace/.venv/bin/python -m pip install -r /workspace/requirements.txt`。',
+                'hint' => '执行 `' . $projectRoot . '/.venv/bin/python -m pip install -r ' . $projectRoot . '/requirements.txt`。',
             ],
         ];
 

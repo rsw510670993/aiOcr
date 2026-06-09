@@ -13,12 +13,12 @@
     <div class="container header-row">
         <div>
             <h1><?= e((string) app_config('app_name')) ?></h1>
-            <p class="muted">PHP 页面编排现有 Python PDF -> OCR -> 翻译 -> 校对流程</p>
+            <p class="muted">按项目目录管理 PDF、图片、OCR、翻译与校对结果</p>
         </div>
         <nav class="nav-links">
             <a href="<?= e(url('index.php')) ?>">主页</a>
             <a href="<?= e(url('preflight.php')) ?>">环境准备</a>
-            <a href="<?= e(url('pdfExtract.php')) ?>">PDF 提取</a>
+            <a href="<?= e(url('pdfExtract.php')) ?>">创建项目</a>
             <a href="<?= e(url('ocr.php')) ?>">OCR</a>
             <a href="<?= e(url('translate.php')) ?>">翻译</a>
             <a href="<?= e(url('proofread.php')) ?>">校对</a>

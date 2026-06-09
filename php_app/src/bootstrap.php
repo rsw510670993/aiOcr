@@ -22,7 +22,7 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
-foreach (['runtime_root', 'jobs_dir', 'logs_dir', 'uploads_dir', 'workspaces_dir'] as $key) {
+foreach (['projects_dir', 'runtime_root', 'jobs_dir', 'logs_dir', 'uploads_dir'] as $key) {
     $dir = $appConfig[$key] ?? null;
     if (is_string($dir) && $dir !== '' && !is_dir($dir)) {
         if (!@mkdir($dir, 0775, true) && !is_dir($dir)) {

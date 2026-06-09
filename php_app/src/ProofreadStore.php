@@ -12,9 +12,9 @@ final class ProofreadStore
     }
 
     /** @return array{proofread_path:string,status_path:string,pages:list<array{page:int,text:string}>,completed_pages:list<int>} */
-    public function loadBundle(string $jobId, string $translationPath): array
+    public function loadBundle(string $projectId, string $translationPath): array
     {
-        $proofreadPath = $this->proofreadPath($jobId, $translationPath);
+        $proofreadPath = $this->proofreadPath($projectId, $translationPath);
         if (!is_file($proofreadPath)) {
             $directory = dirname($proofreadPath);
             if (!is_dir($directory)) {
@@ -47,9 +47,9 @@ final class ProofreadStore
     /** @param list<array{page:int,text:string}> $pages */
     /** @param list<int> $completedPages */
     /** @return array{proofread_path:string,status_path:string} */
-    public function save(string $jobId, string $translationPath, array $pages, array $completedPages): array
+    public function save(string $projectId, string $translationPath, array $pages, array $completedPages): array
     {
-        $bundle = $this->loadBundle($jobId, $translationPath);
+        $bundle = $this->loadBundle($projectId, $translationPath);
         $this->parser->writeFile($bundle['proofread_path'], $pages);
         file_put_contents(
             $bundle['status_path'],
@@ -65,8 +65,9 @@ final class ProofreadStore
         ];
     }
 
-    public function proofreadPath(string $jobId, string $translationPath): string
+    public function proofreadPath(string $projectId, string $translationPath): string
     {
-        return $this->workspaceManager->jobRoot($jobId) . '/proofread_text/' . basename($translationPath);
+        $paths = $this->workspaceManager->existingProjectPaths($projectId);
+        return $paths['proofread_text'] . '/' . basename($translationPath);
     }
 }

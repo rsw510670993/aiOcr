@@ -14,12 +14,12 @@ if (!is_array($payload)) {
 }
 
 try {
-    $jobId = trim((string) ($payload['job_id'] ?? ''));
+    $projectId = trim((string) ($payload['project_id'] ?? ''));
     $translationPath = trim((string) ($payload['translation_path'] ?? ''));
     $pages = $payload['pages'] ?? null;
     $completedPages = $payload['completed_pages'] ?? [];
-    if ($jobId === '' || $translationPath === '' || !is_array($pages)) {
-        throw new RuntimeException('缺少 job_id、translation_path 或 pages。');
+    if ($projectId === '' || $translationPath === '' || !is_array($pages)) {
+        throw new RuntimeException('缺少 project_id、translation_path 或 pages。');
     }
 
     $guard = new PathGuard();
@@ -37,7 +37,7 @@ try {
     $completedPages = array_values(array_unique(array_map('intval', is_array($completedPages) ? $completedPages : [])));
 
     $store = new ProofreadStore(new WorkspaceManager(), new CombinedTextParser());
-    $result = $store->save($jobId, $translationPath, $normalizedPages, $completedPages);
+    $result = $store->save($projectId, $translationPath, $normalizedPages, $completedPages);
 
     json_response([
         'ok' => true,
