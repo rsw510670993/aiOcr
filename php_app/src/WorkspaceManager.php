@@ -108,6 +108,28 @@ final class WorkspaceManager
         return $paths['uploads'] . '/' . $this->safeFilename($originalName, 'images.zip');
     }
 
+    /** @return list<string> */
+    public function imageFiles(string $projectId): array
+    {
+        $paths = $this->existingProjectPaths($projectId);
+        $directory = $paths['exported_jpg'];
+        if (!is_dir($directory)) {
+            return [];
+        }
+        $files = [];
+        foreach (glob($directory . '/*') ?: [] as $path) {
+            if (!is_file($path)) {
+                continue;
+            }
+            $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            if (in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+                $files[] = $path;
+            }
+        }
+        usort($files, static fn (string $a, string $b): int => strnatcasecmp(basename($a), basename($b)));
+        return array_values($files);
+    }
+
     /** @return list<array{id:string,path:string,updated_at:int}> */
     public function listProjects(int $limit = 50): array
     {

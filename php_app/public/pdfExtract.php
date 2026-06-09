@@ -13,9 +13,10 @@ $workspaceManager = new WorkspaceManager();
 $runner = new ProcessRunner($jobStore);
 $locator = new ArtifactLocator($jobStore, $workspaceManager);
 $error = '';
+$success = '';
 
 $writeLog = static function (array $job, string $content): void {
-    file_put_contents((string) $job['log_file'], trim($content) . PHP_EOL);
+    file_put_contents((string) $job['log_file'], trim($content) . PHP_EOL, FILE_APPEND);
 };
 
 $deleteTree = static function (string $path): void {
@@ -34,6 +35,20 @@ $deleteTree = static function (string $path): void {
         }
     }
     @rmdir($path);
+};
+
+$clearDirectory = static function (string $path): void {
+    if (!is_dir($path)) {
+        return;
+    }
+    $iterator = new FilesystemIterator($path, FilesystemIterator::SKIP_DOTS);
+    foreach ($iterator as $item) {
+        if ($item->isDir()) {
+            $deleteTree($item->getPathname());
+        } else {
+            @unlink($item->getPathname());
+        }
+    }
 };
 
 $extractZipImages = static function (string $zipPath, string $targetDir, string $tempDir) use ($deleteTree): int {
@@ -86,8 +101,48 @@ $extractZipImages = static function (string $zipPath, string $targetDir, string 
     return count($images);
 };
 
+$resetProjectImages = static function (array $project) use ($clearDirectory): void {
+    foreach (['exported_jpg', 'ocr_text', 'aigc2d_translation_text', 'proofread_text'] as $key) {
+        if (!empty($project[$key]) && is_string($project[$key])) {
+            $clearDirectory($project[$key]);
+        }
+    }
+};
+
 if (request_method() === 'POST') {
     try {
+        $action = post_string('action', 'import_source');
+        $postedProjectId = $workspaceManager->projectIdFromName(post_string('project_name'));
+
+        if ($action === 'create_empty') {
+            if ($postedProjectId === '') {
+                throw new RuntimeException('请填写项目名称。');
+            }
+            if ($workspaceManager->projectExists($postedProjectId)) {
+                throw new RuntimeException('项目已存在，请更换项目名称：' . $postedProjectId);
+            }
+            $workspaceManager->ensureProject($postedProjectId);
+            $success = '空项目已创建：' . $postedProjectId;
+            redirect_to('pdfExtract.php', ['project_id' => $postedProjectId, 'success' => $success]);
+        }
+
+        if ($action === 'delete_image') {
+            $projectId = $workspaceManager->projectIdFromName(post_string('project_id'));
+            $imageName = basename(post_string('image_name'));
+            if ($projectId === '' || $imageName === '') {
+                throw new RuntimeException('缺少项目或图片名称。');
+            }
+            $project = $workspaceManager->existingProjectPaths($projectId);
+            $imagePath = $project['exported_jpg'] . '/' . $imageName;
+            if (!is_file($imagePath)) {
+                throw new RuntimeException('图片不存在：' . $imageName);
+            }
+            if (!@unlink($imagePath)) {
+                throw new RuntimeException('无法删除图片：' . $imageName);
+            }
+            redirect_to('pdfExtract.php', ['project_id' => $projectId, 'success' => '已删除图片：' . $imageName]);
+        }
+
         if (!isset($_FILES['source']) || !is_array($_FILES['source'])) {
             throw new RuntimeException('请上传 PDF 或 ZIP 文件。');
         }
@@ -104,12 +159,24 @@ if (request_method() === 'POST') {
 
         $projectName = post_string('project_name', pathinfo($originalName, PATHINFO_FILENAME));
         $projectId = $workspaceManager->projectIdFromName($projectName);
-        if ($workspaceManager->projectExists($projectId)) {
-            throw new RuntimeException('项目已存在，请更换项目名称：' . $projectId);
+        $isReimport = $action === 'reimport_source';
+        if ($projectId === '') {
+            throw new RuntimeException('请填写项目名称。');
+        }
+        if ($isReimport) {
+            if (!$workspaceManager->projectExists($projectId)) {
+                throw new RuntimeException('要重新导入的项目不存在：' . $projectId);
+            }
+        } elseif ($workspaceManager->projectExists($projectId)) {
+            throw new RuntimeException('项目已存在，请更换项目名称或使用重新导入。');
         }
         $project = $workspaceManager->ensureProject($projectId);
+        if ($isReimport) {
+            $resetProjectImages($project);
+        }
 
-        $job = $jobStore->create('project_setup', [
+        $jobType = $isReimport ? 'project_reimport' : 'project_setup';
+        $job = $jobStore->create($jobType, [
             'project_id' => $projectId,
             'source_name' => $originalName,
             'source_type' => $extension,
@@ -136,6 +203,10 @@ if (request_method() === 'POST') {
                 'exported_jpg' => $project['exported_jpg'],
             ];
             $job = $jobStore->merge($job, ['artifacts' => $artifacts]);
+
+            if ($isReimport) {
+                $writeLog($job, '已清空项目图片与衍生文本目录，开始重新提取 PDF。');
+            }
 
             $scriptPath = rtrim((string) app_config('project_root'), '/') . '/pdf_to_jpg.py';
             $command = escapeshellarg((string) app_config('python_bin'))
@@ -165,6 +236,9 @@ if (request_method() === 'POST') {
                 'exported_jpg' => $project['exported_jpg'],
             ]),
         ]);
+        if ($isReimport) {
+            $writeLog($job, '已清空项目图片与衍生文本目录，开始重新解压 ZIP。');
+        }
         $writeLog($job, '开始解压 ZIP 到项目目录：' . $project['root']);
         $tempDir = $project['root'] . '/__zip_extract';
         $imageCount = $extractZipImages($zipPath, $project['exported_jpg'], $tempDir);
@@ -190,13 +264,16 @@ if (request_method() === 'POST') {
 $job = null;
 $jobId = get_string('job_id');
 $projectId = get_string('project_id');
+$success = get_string('success');
 if ($jobId !== '') {
     $job = $jobStore->require($jobId);
     $projectId = $projectId !== '' ? $projectId : (string) (($job['artifacts']['project_id'] ?? '') ?: ($job['params']['project_id'] ?? ''));
 }
 $recentProjects = $locator->recentProjects(12);
+$selectedProject = $projectId !== '' ? $locator->projectArtifacts($projectId) : null;
+$projectImages = $projectId !== '' ? $locator->projectImages($projectId) : [];
 
-render_page('创建项目', function () use ($error, $job, $projectId, $recentProjects): void {
+render_page('创建项目', function () use ($error, $success, $job, $projectId, $recentProjects, $selectedProject, $projectImages): void {
 ?>
 <?php if ($job) : ?>
     <section class="panel" data-job-status data-job-id="<?= e((string) $job['id']) ?>" data-status-url="<?= e(url('jobStatus.php')) ?>">
@@ -237,12 +314,15 @@ render_page('创建项目', function () use ($error, $job, $projectId, $recentPr
         <?php if ($error !== '') : ?>
             <div class="alert error"><?= e($error) ?></div>
         <?php endif; ?>
+        <?php if ($success !== '') : ?>
+            <div class="alert success"><?= e($success) ?></div>
+        <?php endif; ?>
         <form method="post" enctype="multipart/form-data">
             <label>项目名称
                 <input type="text" name="project_name" value="<?= e($projectId) ?>" placeholder="例如：book_01">
             </label>
-            <label>上传源文件
-                <input type="file" name="source" accept="application/pdf,.zip,application/zip" required>
+            <label>上传源文件（PDF 或 ZIP）
+                <input type="file" name="source" accept="application/pdf,.zip,application/zip">
             </label>
             <div class="inline-fields">
                 <label>DPI（仅 PDF 生效）
@@ -255,11 +335,17 @@ render_page('创建项目', function () use ($error, $job, $projectId, $recentPr
             <label>PDF 密码（仅 PDF 生效）
                 <input type="text" name="password" placeholder="有密码时填写">
             </label>
-            <button type="submit">创建项目</button>
+            <div class="button-row">
+                <button type="submit" name="action" value="create_empty" class="secondary">创建空项目</button>
+                <button type="submit" name="action" value="import_source">创建并导入</button>
+                <?php if ($selectedProject) : ?>
+                    <button type="submit" name="action" value="reimport_source" class="warn">重新导入并清空旧图</button>
+                <?php endif; ?>
+            </div>
         </form>
         <div class="alert">
             <strong>规则</strong><br>
-            上传 PDF 时会自动提取到项目的 `exported_jpg/`；上传文件夹 ZIP 时会把其中 JPG/JPEG 图片整理为 `page_0001.jpg` 风格文件放入 `exported_jpg/`。
+            允许先创建空项目；上传 PDF 会提取到项目的 `exported_jpg/`；上传文件夹 ZIP 会把其中 JPG/JPEG 图片整理为 `page_0001.jpg` 风格文件放入 `exported_jpg/`；重新导入时会先清空现有图片以及 OCR/翻译/校对文本目录。
         </div>
     </div>
 
@@ -271,6 +357,7 @@ render_page('创建项目', function () use ($error, $job, $projectId, $recentPr
                     <strong><?= e($project['id']) ?></strong>
                     <div><code><?= e(relative_project_path($project['path'])) ?></code></div>
                     <div class="button-row">
+                        <a class="button ghost" href="<?= e(url('pdfExtract.php', ['project_id' => $project['id']])) ?>">管理项目</a>
                         <a class="button ghost" href="<?= e(url('ocr.php', ['project_id' => $project['id']])) ?>">OCR</a>
                         <a class="button ghost" href="<?= e(url('translate.php', ['project_id' => $project['id']])) ?>">翻译</a>
                         <a class="button ghost" href="<?= e(url('proofread.php', ['project_id' => $project['id']])) ?>">校对</a>
@@ -281,5 +368,39 @@ render_page('创建项目', function () use ($error, $job, $projectId, $recentPr
         </ul>
     </div>
 </section>
+
+<?php if ($selectedProject) : ?>
+<section class="panel">
+    <h2>项目图片管理</h2>
+    <div class="proofread-meta">
+        <span>项目：<code><?= e($selectedProject['project_id']) ?></code></span>
+        <span>图片目录：<code><?= e(relative_project_path($selectedProject['exported_jpg'])) ?></code></span>
+        <span>图片数量：<strong><?= count($projectImages) ?></strong></span>
+    </div>
+    <?php if ($projectImages === []) : ?>
+        <div class="alert">当前项目还没有图片。你可以手动上传图片到服务器目录，或使用上方“创建并导入 / 重新导入并清空旧图”。</div>
+    <?php else : ?>
+        <div class="image-grid">
+            <?php foreach ($projectImages as $imagePath) : ?>
+                <div class="image-card">
+                    <div class="image-card-preview">
+                        <img src="<?= e(url('file.php', ['path' => $imagePath])) ?>" alt="<?= e(basename($imagePath)) ?>">
+                    </div>
+                    <div class="image-card-meta">
+                        <strong><?= e(basename($imagePath)) ?></strong>
+                        <span class="small muted"><?= e(format_bytes((int) filesize($imagePath))) ?></span>
+                    </div>
+                    <form method="post">
+                        <input type="hidden" name="action" value="delete_image">
+                        <input type="hidden" name="project_id" value="<?= e($selectedProject['project_id']) ?>">
+                        <input type="hidden" name="image_name" value="<?= e(basename($imagePath)) ?>">
+                        <button type="submit" class="warn">删除图片</button>
+                    </form>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</section>
+<?php endif; ?>
 <?php
 });

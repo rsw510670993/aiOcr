@@ -63,6 +63,16 @@ final class ArtifactLocator
         return $this->workspaceManager->textFiles($projectId, $folder);
     }
 
+    /** @return list<string> */
+    public function projectImages(string $projectId): array
+    {
+        try {
+            return $this->workspaceManager->imageFiles($projectId);
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
     /** @return array<string, string>|null */
     public function projectArtifacts(?string $projectId): ?array
     {
