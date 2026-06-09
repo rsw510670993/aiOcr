@@ -89,7 +89,7 @@
 
         $allReady = count(array_filter($checks, static fn (array $check): bool => $check['ok'])) === count($checks);
 
-        render_page('环境准备', function () use ($checks, $allReady): void {
+        render_page('环境准备', function () use ($checks, $allReady, $projectRoot): void {
         ?>
         <section class="panel">
             <h2>环境检查</h2>
