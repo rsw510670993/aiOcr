@@ -51,8 +51,9 @@ if (request_method() === 'POST') {
         ];
         $job = $jobStore->merge($job, ['artifacts' => $artifacts]);
 
+        $scriptPath = rtrim((string) app_config('project_root'), '/') . '/pdf_to_jpg.py';
         $command = escapeshellarg((string) app_config('python_bin'))
-            . ' ' . escapeshellarg('/workspace/pdf_to_jpg.py')
+            . ' ' . escapeshellarg($scriptPath)
             . ' ' . escapeshellarg($pdfPath)
             . ' --output ' . escapeshellarg($workspace['exported_jpg'])
             . ' --dpi ' . $dpi

@@ -55,8 +55,9 @@ if (request_method() === 'POST') {
         ];
         $job = $jobStore->merge($job, ['artifacts' => $artifacts]);
 
+        $scriptPath = rtrim((string) app_config('project_root'), '/') . '/aigc2d_ocr.py';
         $command = escapeshellarg((string) app_config('python_bin'))
-            . ' ' . escapeshellarg('/workspace/aigc2d_ocr.py')
+            . ' ' . escapeshellarg($scriptPath)
             . ' --image-dir ' . escapeshellarg($imageDir)
             . ' --pages ' . escapeshellarg($pages)
             . ' --combined-output ' . escapeshellarg($combinedOutput)

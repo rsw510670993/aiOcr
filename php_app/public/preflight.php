@@ -120,11 +120,11 @@
 
         <section class="panel">
             <h2>建议命令</h2>
-            <pre>python3 -m venv /workspace/.venv
-/workspace/.venv/bin/python -m pip install -r /workspace/requirements.txt
+            <pre>python3 -m venv <?= e($projectRoot) ?>/.venv
+<?= e($projectRoot) ?>/.venv/bin/python -m pip install -r <?= e($projectRoot) ?>/requirements.txt
 # 手动放置以下文件
-/workspace/aigc2d.key
-/workspace/名词表.csv</pre>
+<?= e($projectRoot) ?>/aigc2d.key
+<?= e($projectRoot) ?>/名词表.csv</pre>
         </section>
         <?php
         });
