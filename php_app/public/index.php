@@ -27,7 +27,7 @@ render_page('主页', function () use ($jobs, $imageDirs, $ocrFiles, $translatio
         <div class="job-card">
             <h3>2. PDF 提取</h3>
             <p>上传 PDF，调用 `pdf_to_jpg.py` 输出 `page_0001.jpg` 风格图片。</p>
-            <a class="button" href="<?= e(url('pdf_extract.php')) ?>">打开提取页</a>
+            <a class="button" href="<?= e(url('pdfExtract.php')) ?>">打开提取页</a>
         </div>
         <div class="job-card">
             <h3>3. OCR 识别</h3>

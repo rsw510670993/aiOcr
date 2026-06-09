@@ -90,7 +90,7 @@ if ($jobId !== '' || ($imageDir !== '' && $ocrPath !== '' && $translationPath !=
             'proofread_path' => $bundle['proofread_path'],
             'completed_pages' => $bundle['completed_pages'],
             'pages' => $pages,
-            'save_url' => url('save_proofread.php'),
+            'save_url' => url('saveProofread.php'),
         ];
     } catch (Throwable $throwable) {
         $error = $throwable->getMessage();

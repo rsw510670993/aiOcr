@@ -144,7 +144,7 @@ render_page('翻译', function () use ($error, $job, $ocrChoices, $defaultOcrPat
 </section>
 
 <?php if ($job) : ?>
-    <section class="panel" data-job-status data-job-id="<?= e((string) $job['id']) ?>" data-status-url="<?= e(url('job_status.php')) ?>">
+    <section class="panel" data-job-status data-job-id="<?= e((string) $job['id']) ?>" data-status-url="<?= e(url('jobStatus.php')) ?>">
         <h2>翻译任务状态</h2>
         <div class="proofread-meta">
             <span>任务 ID：<code><?= e((string) $job['id']) ?></code></span>

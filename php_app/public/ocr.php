@@ -139,7 +139,7 @@ render_page('OCR 识别', function () use ($error, $job, $imageDirChoices, $defa
 </section>
 
 <?php if ($job) : ?>
-    <section class="panel" data-job-status data-job-id="<?= e((string) $job['id']) ?>" data-status-url="<?= e(url('job_status.php')) ?>">
+    <section class="panel" data-job-status data-job-id="<?= e((string) $job['id']) ?>" data-status-url="<?= e(url('jobStatus.php')) ?>">
         <h2>OCR 任务状态</h2>
         <div class="proofread-meta">
             <span>任务 ID：<code><?= e((string) $job['id']) ?></code></span>

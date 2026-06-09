@@ -17,7 +17,7 @@
         <nav class="nav-links">
             <a href="<?= e(url('index.php')) ?>">主页</a>
             <a href="<?= e(url('preflight.php')) ?>">环境准备</a>
-            <a href="<?= e(url('pdf_extract.php')) ?>">PDF 提取</a>
+            <a href="<?= e(url('pdfExtract.php')) ?>">PDF 提取</a>
             <a href="<?= e(url('ocr.php')) ?>">OCR</a>
             <a href="<?= e(url('translate.php')) ?>">翻译</a>
             <a href="<?= e(url('proofread.php')) ?>">校对</a>

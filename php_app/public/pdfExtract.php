@@ -62,7 +62,7 @@ if (request_method() === 'POST') {
         }
 
         $runner->start($job, $command, (string) app_config('project_root'), $artifacts);
-        redirect_to('pdf_extract.php', ['job_id' => $job['id']]);
+        redirect_to('pdfExtract.php', ['job_id' => $job['id']]);
     } catch (Throwable $throwable) {
         $error = $throwable->getMessage();
     }
@@ -113,7 +113,7 @@ render_page('PDF 提取', function () use ($error, $job, $recentJobs): void {
                     <strong><?= e((string) $recentJob['id']) ?></strong>
                     <div><span class="status-pill status-<?= e((string) $recentJob['status']) ?>"><?= e((string) $recentJob['status']) ?></span></div>
                     <div class="small"><?= e(format_time($recentJob['created_at'] ?? null)) ?></div>
-                    <div><a href="<?= e(url('pdf_extract.php', ['job_id' => $recentJob['id']])) ?>">查看任务</a></div>
+                    <div><a href="<?= e(url('pdfExtract.php', ['job_id' => $recentJob['id']])) ?>">查看任务</a></div>
                 </li>
             <?php endforeach; ?>
             <?php if ($recentJobs === []) : ?><li class="muted">暂无记录。</li><?php endif; ?>
@@ -122,7 +122,7 @@ render_page('PDF 提取', function () use ($error, $job, $recentJobs): void {
 </section>
 
 <?php if ($job) : ?>
-    <section class="panel" data-job-status data-job-id="<?= e((string) $job['id']) ?>" data-status-url="<?= e(url('job_status.php')) ?>">
+    <section class="panel" data-job-status data-job-id="<?= e((string) $job['id']) ?>" data-status-url="<?= e(url('jobStatus.php')) ?>">
         <h2>任务状态</h2>
         <div class="proofread-meta">
             <span>任务 ID：<code><?= e((string) $job['id']) ?></code></span>
