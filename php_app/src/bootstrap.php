@@ -69,14 +69,24 @@ function e(mixed $value): string
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+function app_base_path(): string
+{
+    $scriptName = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
+    $basePath = str_replace('\\', '/', dirname($scriptName));
+    if ($basePath === '/' || $basePath === '.') {
+        return '';
+    }
+    return rtrim($basePath, '/');
+}
+
 function asset_url(string $path): string
 {
-    return '/assets/' . ltrim($path, '/');
+    return app_base_path() . '/assets/' . ltrim($path, '/');
 }
 
 function url(string $script, array $query = []): string
 {
-    $base = '/' . ltrim($script, '/');
+    $base = app_base_path() . '/' . ltrim($script, '/');
     if ($query === []) {
         return $base;
     }
