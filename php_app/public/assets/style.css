@@ -152,6 +152,9 @@ pre {
   display: grid;
   gap: 4px;
 }
+.project-rules {
+  margin-top: 18px;
+}
 .preflight-table th:nth-child(2),
 .preflight-table td:nth-child(2) {
   min-width: 84px;

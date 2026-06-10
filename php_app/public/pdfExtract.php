@@ -343,7 +343,7 @@ render_page('创建项目', function () use ($error, $success, $job, $projectId,
                 <?php endif; ?>
             </div>
         </form>
-        <div class="alert">
+        <div class="alert project-rules">
             <strong>规则</strong><br>
             允许先创建空项目；上传 PDF 会提取到项目的 `exported_jpg/`；上传文件夹 ZIP 会把其中 JPG/JPEG 图片整理为 `page_0001.jpg` 风格文件放入 `exported_jpg/`；重新导入时会先清空现有图片以及 OCR/翻译/校对文本目录。
         </div>
