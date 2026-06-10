@@ -149,9 +149,9 @@ render_page('校对', function () use ($error, $projectId, $ocrPath, $translatio
         <h2>当前校对稿</h2>
         <div class="proofread-meta">
             <span>项目：<code><?= e($proofreadPayload['project_id']) ?></code></span>
-            <span>OCR：<code><?= e(relative_project_path($proofreadPayload['ocr_path'])) ?></code></span>
-            <span>译文：<code><?= e(relative_project_path($proofreadPayload['translation_path'])) ?></code></span>
-            <span>校对稿：<code><?= e(relative_project_path($proofreadPayload['proofread_path'])) ?></code></span>
+            <span>OCR：<code><?= e(basename((string) $proofreadPayload['ocr_path'])) ?></code></span>
+            <span>译文：<code><?= e(basename((string) $proofreadPayload['translation_path'])) ?></code></span>
+            <span>校对稿：<code><?= e(basename((string) $proofreadPayload['proofread_path'])) ?></code></span>
         </div>
     </section>
 
