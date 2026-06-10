@@ -31,8 +31,20 @@ if ($projectId !== '') {
     $projectId = $workspaceManager->projectIdFromName($projectId);
     $project = $locator->projectArtifacts($projectId);
     if ($project) {
-        $ocrChoices = $locator->projectFiles($projectId, 'ocr_text');
+        $ocrChoices = array_values(array_filter(
+            $locator->projectFiles($projectId, 'ocr_text'),
+            static fn (string $path): bool => str_ends_with($path, '.jp.txt')
+        ));
         $translationChoices = $locator->projectFiles($projectId, 'aigc2d_translation_text');
+        if ($ocrPath !== '' && !str_ends_with(basename($ocrPath), '.jp.txt')) {
+            $base = basename($ocrPath);
+            if (str_ends_with($base, '.txt')) {
+                $candidate = $project['ocr_text'] . '/' . substr($base, 0, -4) . '.jp.txt';
+                $ocrPath = is_file($candidate) ? $candidate : '';
+            } else {
+                $ocrPath = '';
+            }
+        }
         if ($ocrPath === '' && $ocrChoices !== []) {
             $ocrPath = $ocrChoices[0];
         }
@@ -49,6 +61,9 @@ if ($projectId !== '' && $ocrPath !== '' && $translationPath !== '') {
         }
         $imageDir = $guard->assertDir($project['exported_jpg']);
         $ocrPath = $guard->assertFile($ocrPath);
+        if (!str_ends_with($ocrPath, '.jp.txt')) {
+            throw new RuntimeException('校对页面仅允许选择日语校对后的 OCR 文件（.jp.txt）。');
+        }
         $translationPath = $guard->assertFile($translationPath);
 
         $ocrPages = $parser->parseFile($ocrPath);
@@ -91,6 +106,7 @@ if ($projectId !== '' && $ocrPath !== '' && $translationPath !== '') {
         }
 
         $proofreadPayload = [
+            'kind' => 'translation',
             'project_id' => $projectId,
             'project_root' => $project['root'],
             'image_dir' => $imageDir,
@@ -113,7 +129,7 @@ render_page('校对', function () use ($error, $projectId, $ocrPath, $translatio
     <?php if ($error !== '') : ?>
         <div class="alert error"><?= e($error) ?></div>
     <?php endif; ?>
-    <form method="get" data-project-files-form data-project-files-url="<?= e(url('projectFiles.php')) ?>">
+    <form method="get" data-project-files-form data-project-files-url="<?= e(url('projectFiles.php')) ?>" data-ocr-files-key="jp_ocr_files">
         <label>项目 ID
             <input data-project-id-input type="text" name="project_id" list="project-id-options" value="<?= e($projectId) ?>" placeholder="例如：book_01" required>
             <datalist id="project-id-options">
@@ -123,9 +139,9 @@ render_page('校对', function () use ($error, $projectId, $ocrPath, $translatio
             </datalist>
         </label>
         <div class="inline-fields">
-            <label>OCR 合并文件
+            <label>日语校对后 OCR 文件
                 <select data-ocr-path-input name="ocr_path" data-current-value="<?= e($ocrPath) ?>">
-                    <option value="">请选择 OCR 合并文件</option>
+                    <option value="">请选择日语校对文件</option>
                     <?php foreach ($ocrChoices as $path) : ?>
                         <option value="<?= e($path) ?>" <?= $ocrPath === $path ? 'selected' : '' ?>><?= e(basename($path)) ?></option>
                     <?php endforeach; ?>

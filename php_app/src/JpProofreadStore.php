@@ -5,7 +5,7 @@ namespace App;
 
 use RuntimeException;
 
-final class ProofreadStore
+final class JpProofreadStore
 {
     public function __construct(
         private readonly WorkspaceManager $workspaceManager,
@@ -13,22 +13,22 @@ final class ProofreadStore
     ) {
     }
 
-    /** @return array{proofread_path:string,status_path:string,pages:list<array{page:int,text:string}>,completed_pages:list<int>} */
-    public function loadBundle(string $projectId, string $translationPath): array
+    /** @return array{jp_path:string,status_path:string,pages:list<array{page:int,text:string}>,completed_pages:list<int>} */
+    public function loadBundle(string $projectId, string $ocrPath): array
     {
-        $proofreadPath = $this->proofreadPath($projectId, $translationPath);
-        if (!is_file($proofreadPath)) {
-            $directory = dirname($proofreadPath);
+        $jpPath = $this->jpPath($projectId, $ocrPath);
+        if (!is_file($jpPath)) {
+            $directory = dirname($jpPath);
             if (!is_dir($directory)) {
                 if (!@mkdir($directory, 0775, true) && !is_dir($directory)) {
-                    throw new RuntimeException('无法创建校对目录：' . $directory);
+                    throw new RuntimeException('无法创建日语校对目录：' . $directory);
                 }
             }
-            copy($translationPath, $proofreadPath);
+            copy($ocrPath, $jpPath);
         }
 
-        $statusPath = $proofreadPath . '.status.json';
-        $pages = $this->parser->parseFile($proofreadPath);
+        $statusPath = $jpPath . '.status.json';
+        $pages = $this->parser->parseFile($jpPath);
         $status = ['completed_pages' => []];
         if (is_file($statusPath)) {
             $decoded = json_decode((string) file_get_contents($statusPath), true);
@@ -41,7 +41,7 @@ final class ProofreadStore
         sort($completedPages);
 
         return [
-            'proofread_path' => $proofreadPath,
+            'jp_path' => $jpPath,
             'status_path' => $statusPath,
             'pages' => $pages,
             'completed_pages' => $completedPages,
@@ -50,11 +50,11 @@ final class ProofreadStore
 
     /** @param list<array{page:int,text:string}> $pages */
     /** @param list<int> $completedPages */
-    /** @return array{proofread_path:string,status_path:string} */
-    public function save(string $projectId, string $translationPath, array $pages, array $completedPages): array
+    /** @return array{jp_path:string,status_path:string} */
+    public function save(string $projectId, string $ocrPath, array $pages, array $completedPages): array
     {
-        $bundle = $this->loadBundle($projectId, $translationPath);
-        $this->parser->writeFile($bundle['proofread_path'], $pages);
+        $bundle = $this->loadBundle($projectId, $ocrPath);
+        $this->parser->writeFile($bundle['jp_path'], $pages);
         file_put_contents(
             $bundle['status_path'],
             json_encode([
@@ -64,14 +64,17 @@ final class ProofreadStore
         );
 
         return [
-            'proofread_path' => $bundle['proofread_path'],
+            'jp_path' => $bundle['jp_path'],
             'status_path' => $bundle['status_path'],
         ];
     }
 
-    public function proofreadPath(string $projectId, string $translationPath): string
+    public function jpPath(string $projectId, string $ocrPath): string
     {
         $paths = $this->workspaceManager->existingProjectPaths($projectId);
-        return $paths['proofread_text'] . '/' . basename($translationPath);
+        $ocrDir = $paths['ocr_text'];
+        $base = basename($ocrPath);
+        $name = str_ends_with($base, '.txt') ? substr($base, 0, -4) : $base;
+        return $ocrDir . '/' . $name . '.jp.txt';
     }
 }

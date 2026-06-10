@@ -35,13 +35,18 @@ render_page('主页', function () use ($jobs, $projects): void {
             <a class="button" href="<?= e(url('ocr.php')) ?>">打开 OCR 页</a>
         </div>
         <div class="job-card">
-            <h3>4. 翻译</h3>
-            <p>按项目选择 OCR 文件，调用 `aigc2d_translate.py` 输出译文。</p>
+            <h3>4. 日语校对</h3>
+            <p>对 OCR 日文原文逐页校对，输出 `.jp.txt` 文件。</p>
+            <a class="button" href="<?= e(url('jpProofread.php')) ?>">打开日语校对页</a>
+        </div>
+        <div class="job-card">
+            <h3>5. 翻译</h3>
+            <p>按项目选择日语校对后的 OCR 文件，调用 `aigc2d_translate.py` 输出译文。</p>
             <a class="button" href="<?= e(url('translate.php')) ?>">打开翻译页</a>
         </div>
         <div class="job-card">
-            <h3>5. 校对</h3>
-            <p>基于项目加载图片、OCR、译文，按页人工校对并保存定稿。</p>
+            <h3>6. 校对</h3>
+            <p>基于项目加载图片、日语校对稿、译文，按页人工校对并保存定稿。</p>
             <a class="button" href="<?= e(url('proofread.php')) ?>">打开校对页</a>
         </div>
     </div>
@@ -57,6 +62,7 @@ render_page('主页', function () use ($jobs, $projects): void {
                     <div><code><?= e(relative_project_path($project['path'])) ?></code></div>
                     <div class="button-row">
                         <a class="button ghost" href="<?= e(url('ocr.php', ['project_id' => $project['id']])) ?>">OCR</a>
+                        <a class="button ghost" href="<?= e(url('jpProofread.php', ['project_id' => $project['id']])) ?>">日语校对</a>
                         <a class="button ghost" href="<?= e(url('translate.php', ['project_id' => $project['id']])) ?>">翻译</a>
                         <a class="button ghost" href="<?= e(url('proofread.php', ['project_id' => $project['id']])) ?>">校对</a>
                     </div>

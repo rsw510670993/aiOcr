@@ -20,6 +20,7 @@
             <a href="<?= e(url('preflight.php')) ?>">环境准备</a>
             <a href="<?= e(url('pdfExtract.php')) ?>">创建项目</a>
             <a href="<?= e(url('ocr.php')) ?>">OCR</a>
+            <a href="<?= e(url('jpProofread.php')) ?>">日语校对</a>
             <a href="<?= e(url('translate.php')) ?>">翻译</a>
             <a href="<?= e(url('proofread.php')) ?>">校对</a>
         </nav>

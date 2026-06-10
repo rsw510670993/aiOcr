@@ -71,13 +71,16 @@
     return;
   }
 
+  const kind = payload.kind || (payload.translation_path ? 'translation' : 'jp');
+
   const state = {
     pages: payload.pages,
     completedPages: new Set(payload.completed_pages || []),
     index: 0,
     saveUrl: payload.save_url,
     projectId: payload.project_id,
-    translationPath: payload.translation_path,
+    sourceKey: kind === 'jp' ? 'ocr_path' : 'translation_path',
+    sourcePath: kind === 'jp' ? payload.ocr_path : payload.translation_path,
   };
 
   const el = {
@@ -113,7 +116,9 @@
     el.pageCounter.textContent = '第 ' + (state.index + 1) + ' / ' + state.pages.length + ' 页';
     el.image.src = page.image_url;
     el.ocrText.value = page.ocr_text;
-    el.translationText.value = page.translation_text;
+    if (el.translationText) {
+      el.translationText.value = page.translation_text || '';
+    }
     el.proofreadText.value = page.proofread_text;
     el.completedToggle.checked = state.completedPages.has(page.page);
     el.statusText.textContent = '已校页数：' + state.completedPages.size + ' / ' + state.pages.length;
@@ -124,21 +129,23 @@
   const save = async (message) => {
     syncCurrentDraft();
     el.saveMessage.textContent = '保存中...';
+    const requestBody = {
+      project_id: state.projectId,
+      completed_pages: Array.from(state.completedPages),
+      pages: state.pages.map((page) => ({ page: page.page, text: page.proofread_text || '' })),
+    };
+    requestBody[state.sourceKey] = state.sourcePath;
     const response = await fetch(state.saveUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        project_id: state.projectId,
-        translation_path: state.translationPath,
-        completed_pages: Array.from(state.completedPages),
-        pages: state.pages.map((page) => ({ page: page.page, text: page.proofread_text || '' })),
-      }),
+      body: JSON.stringify(requestBody),
     });
     const data = await response.json();
     if (!response.ok || !data.ok) {
       throw new Error(data.error || '保存失败');
     }
-    el.saveMessage.textContent = message + '，输出文件：' + data.proofread_path;
+    const outputPath = data.proofread_path || data.jp_path || data.output_path || '';
+    el.saveMessage.textContent = message + (outputPath ? '，输出文件：' + outputPath : '');
     render();
   };
 
@@ -232,6 +239,8 @@
 
     const ocrInput = form.querySelector('[data-ocr-path-input]');
     const translationInput = form.querySelector('[data-translation-path-input]');
+    const ocrKey = form.dataset.ocrFilesKey || 'ocr_files';
+    const translationKey = form.dataset.translationFilesKey || 'translation_files';
     let lastProjectId = String(projectInput.value || '').trim();
 
     const load = async () => {
@@ -253,13 +262,13 @@
         }
         refreshSelect(
           ocrInput,
-          data.ocr_files || [],
+          data[ocrKey] || [],
           projectChanged ? '' : ocrInput && ocrInput.value,
           '请选择项目内 OCR 文件'
         );
         refreshSelect(
           translationInput,
-          data.translation_files || [],
+          data[translationKey] || [],
           projectChanged ? '' : translationInput && translationInput.value,
           '请选择项目内翻译文件'
         );

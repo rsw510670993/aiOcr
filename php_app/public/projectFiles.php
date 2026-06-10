@@ -22,10 +22,19 @@ if (!$project) {
     json_response(['ok' => false, 'error' => '项目不存在：' . $projectId], 404);
 }
 
+$ocrFiles = $locator->projectFiles($projectId, 'ocr_text');
+
 json_response([
     'ok' => true,
     'project_id' => $projectId,
-    'ocr_files' => $locator->projectFiles($projectId, 'ocr_text'),
+    'ocr_files' => $ocrFiles,
+    'raw_ocr_files' => array_values(array_filter(
+        $ocrFiles,
+        static fn (string $path): bool => str_ends_with($path, '.txt') && !str_ends_with($path, '.jp.txt')
+    )),
+    'jp_ocr_files' => array_values(array_filter(
+        $ocrFiles,
+        static fn (string $path): bool => str_ends_with($path, '.jp.txt')
+    )),
     'translation_files' => $locator->projectFiles($projectId, 'aigc2d_translation_text'),
 ]);
-

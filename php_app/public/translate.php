@@ -25,6 +25,9 @@ if (request_method() === 'POST') {
         $projectId = $workspaceManager->projectIdFromName(post_string('project_id'));
         $project = $workspaceManager->existingProjectPaths($projectId);
         $ocrPath = $guard->assertFile(post_string('ocr_path'));
+        if (!str_ends_with($ocrPath, '.jp.txt')) {
+            throw new RuntimeException('翻译页面仅允许选择日语校对后的 OCR 文件（.jp.txt）。');
+        }
         $pages = post_string('pages');
         $model = post_string('model', 'gemini-3.1-flash-lite');
         $timeout = max(30, (int) post_string('request_timeout', '300'));
@@ -96,8 +99,18 @@ if ($jobId !== '') {
     $defaultOcrPath = $defaultOcrPath !== '' ? $defaultOcrPath : (string) (($job['artifacts']['ocr_text'] ?? '') ?: ($job['params']['ocr_path'] ?? ''));
 }
 $projectChoices = $locator->recentProjects(20);
-$ocrChoices = $defaultProjectId !== '' ? $locator->projectFiles($defaultProjectId, 'ocr_text') : [];
 $project = $defaultProjectId !== '' ? $locator->projectArtifacts($defaultProjectId) : null;
+$ocrAllChoices = $defaultProjectId !== '' ? $locator->projectFiles($defaultProjectId, 'ocr_text') : [];
+$ocrChoices = array_values(array_filter($ocrAllChoices, static fn (string $path): bool => str_ends_with($path, '.jp.txt')));
+if ($project && $defaultOcrPath !== '' && !str_ends_with(basename($defaultOcrPath), '.jp.txt')) {
+    $base = basename($defaultOcrPath);
+    if (str_ends_with($base, '.txt')) {
+        $candidate = $project['ocr_text'] . '/' . substr($base, 0, -4) . '.jp.txt';
+        $defaultOcrPath = is_file($candidate) ? $candidate : '';
+    } else {
+        $defaultOcrPath = '';
+    }
+}
 if ($defaultOcrPath === '' && $ocrChoices !== []) {
     $defaultOcrPath = $ocrChoices[0];
 }
@@ -142,7 +155,7 @@ render_page('翻译', function () use ($error, $job, $projectChoices, $defaultPr
     <?php if ($error !== '') : ?>
         <div class="alert error"><?= e($error) ?></div>
     <?php endif; ?>
-    <form method="post" data-project-files-form data-project-files-url="<?= e(url('projectFiles.php')) ?>">
+    <form method="post" data-project-files-form data-project-files-url="<?= e(url('projectFiles.php')) ?>" data-ocr-files-key="jp_ocr_files">
         <label>项目 ID
             <input data-project-id-input type="text" name="project_id" list="project-id-options" value="<?= e($defaultProjectId) ?>" placeholder="例如：book_01" required>
             <datalist id="project-id-options">
@@ -157,9 +170,9 @@ render_page('翻译', function () use ($error, $job, $projectChoices, $defaultPr
                 译文输出目录：<code><?= e(relative_project_path($project['aigc2d_translation_text'])) ?></code>
             </div>
         <?php endif; ?>
-        <label>OCR 合并文件
+        <label>日语校对后 OCR 文件
             <select data-ocr-path-input name="ocr_path" data-current-value="<?= e($defaultOcrPath) ?>" required>
-                <option value="">请选择项目内 OCR 文件</option>
+                <option value="">请选择项目内日语校对文件</option>
                 <?php foreach ($ocrChoices as $path) : ?>
                     <option value="<?= e($path) ?>" <?= $defaultOcrPath === $path ? 'selected' : '' ?>><?= e(basename($path)) ?></option>
                 <?php endforeach; ?>

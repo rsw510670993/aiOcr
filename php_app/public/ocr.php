@@ -110,7 +110,7 @@ render_page('OCR 识别', function () use ($error, $job, $projectChoices, $defau
                 </div>
                 <div class="button-row">
                     <?php if (!empty($job['artifacts']['project_id']) && !empty($job['artifacts']['ocr_text'])) : ?>
-                        <a class="button ghost" href="<?= e(url('translate.php', ['project_id' => (string) $job['artifacts']['project_id'], 'ocr_path' => (string) $job['artifacts']['ocr_text']])) ?>">进入翻译</a>
+                        <a class="button ghost" href="<?= e(url('jpProofread.php', ['project_id' => (string) $job['artifacts']['project_id'], 'ocr_path' => (string) $job['artifacts']['ocr_text']])) ?>">进入日语校对</a>
                     <?php endif; ?>
                 </div>
             </div>

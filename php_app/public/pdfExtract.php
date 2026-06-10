@@ -143,6 +143,45 @@ if (request_method() === 'POST') {
             redirect_to('pdfExtract.php', ['project_id' => $projectId, 'success' => '已删除图片：' . $imageName]);
         }
 
+        if ($action === 'delete_stage_file') {
+            $projectId = $workspaceManager->projectIdFromName(post_string('project_id'));
+            $stage = post_string('stage');
+            $filename = basename(post_string('filename'));
+            if ($projectId === '' || $stage === '' || $filename === '') {
+                throw new RuntimeException('缺少项目、阶段或文件名。');
+            }
+            $project = $workspaceManager->existingProjectPaths($projectId);
+            if (!in_array($stage, ['ocr_text', 'aigc2d_translation_text', 'proofread_text'], true)) {
+                throw new RuntimeException('不支持的阶段：' . $stage);
+            }
+            $target = $project[$stage] . '/' . $filename;
+            if (!is_file($target)) {
+                throw new RuntimeException('文件不存在：' . $filename);
+            }
+            if (!@unlink($target)) {
+                throw new RuntimeException('无法删除文件：' . $filename);
+            }
+            if (is_file($target . '.status.json')) {
+                @unlink($target . '.status.json');
+            }
+            if ($stage === 'ocr_text') {
+                if (str_ends_with($filename, '.jp.txt')) {
+                    if (is_file($target . '.status.json')) {
+                        @unlink($target . '.status.json');
+                    }
+                } elseif (str_ends_with($filename, '.txt')) {
+                    $jpPath = $project['ocr_text'] . '/' . substr($filename, 0, -4) . '.jp.txt';
+                    if (is_file($jpPath)) {
+                        @unlink($jpPath);
+                    }
+                    if (is_file($jpPath . '.status.json')) {
+                        @unlink($jpPath . '.status.json');
+                    }
+                }
+            }
+            redirect_to('pdfExtract.php', ['project_id' => $projectId, 'success' => '已删除文件：' . $filename]);
+        }
+
         if (!isset($_FILES['source']) || !is_array($_FILES['source'])) {
             throw new RuntimeException('请上传 PDF 或 ZIP 文件。');
         }
@@ -273,7 +312,22 @@ $recentProjects = $locator->recentProjects(12);
 $selectedProject = $projectId !== '' ? $locator->projectArtifacts($projectId) : null;
 $projectImages = $projectId !== '' ? $locator->projectImages($projectId) : [];
 
-render_page('创建项目', function () use ($error, $success, $job, $projectId, $recentProjects, $selectedProject, $projectImages): void {
+$listTxtFiles = static function (?string $dir): array {
+    if (!is_string($dir) || $dir === '' || !is_dir($dir)) {
+        return [];
+    }
+    $files = glob($dir . '/*.txt') ?: [];
+    usort($files, static fn (string $a, string $b): int => (filemtime($b) ?: 0) <=> (filemtime($a) ?: 0));
+    return array_values($files);
+};
+
+$ocrAllFiles = $selectedProject ? $listTxtFiles($selectedProject['ocr_text'] ?? null) : [];
+$ocrRawFiles = array_values(array_filter($ocrAllFiles, static fn (string $path): bool => !str_ends_with($path, '.jp.txt')));
+$ocrJpFiles = array_values(array_filter($ocrAllFiles, static fn (string $path): bool => str_ends_with($path, '.jp.txt')));
+$translationFiles = $selectedProject ? $listTxtFiles($selectedProject['aigc2d_translation_text'] ?? null) : [];
+$proofreadFiles = $selectedProject ? $listTxtFiles($selectedProject['proofread_text'] ?? null) : [];
+
+render_page('创建项目', function () use ($error, $success, $job, $projectId, $recentProjects, $selectedProject, $projectImages, $ocrRawFiles, $ocrJpFiles, $translationFiles, $proofreadFiles): void {
 ?>
 <?php if ($job) : ?>
     <section class="panel" data-job-status data-job-id="<?= e((string) $job['id']) ?>" data-status-url="<?= e(url('jobStatus.php')) ?>">
@@ -359,6 +413,7 @@ render_page('创建项目', function () use ($error, $success, $job, $projectId,
                     <div class="button-row">
                         <a class="button ghost" href="<?= e(url('pdfExtract.php', ['project_id' => $project['id']])) ?>">管理项目</a>
                         <a class="button ghost" href="<?= e(url('ocr.php', ['project_id' => $project['id']])) ?>">OCR</a>
+                        <a class="button ghost" href="<?= e(url('jpProofread.php', ['project_id' => $project['id']])) ?>">日语校对</a>
                         <a class="button ghost" href="<?= e(url('translate.php', ['project_id' => $project['id']])) ?>">翻译</a>
                         <a class="button ghost" href="<?= e(url('proofread.php', ['project_id' => $project['id']])) ?>">校对</a>
                     </div>
@@ -399,6 +454,147 @@ render_page('创建项目', function () use ($error, $success, $job, $projectId,
                 </div>
             <?php endforeach; ?>
         </div>
+    <?php endif; ?>
+</section>
+
+<section class="panel">
+    <h2>阶段文件删除</h2>
+    <div class="alert">删除原始 OCR 文件（.txt）时，会同时删除同名日语校对文件（.jp.txt）及其状态文件（如存在）。</div>
+
+    <h3>OCR 原始文件</h3>
+    <?php if ($ocrRawFiles === []) : ?>
+        <div class="muted">暂无 OCR 原始文件。</div>
+    <?php else : ?>
+        <table>
+            <thead>
+            <tr>
+                <th>文件名</th>
+                <th>大小</th>
+                <th>更新时间</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($ocrRawFiles as $path) : ?>
+                <tr>
+                    <td><code><?= e(basename($path)) ?></code></td>
+                    <td><?= e(format_bytes((int) filesize($path))) ?></td>
+                    <td><?= e(date('Y-m-d H:i:s', (int) (filemtime($path) ?: time()))) ?></td>
+                    <td>
+                        <form method="post">
+                            <input type="hidden" name="action" value="delete_stage_file">
+                            <input type="hidden" name="project_id" value="<?= e($selectedProject['project_id']) ?>">
+                            <input type="hidden" name="stage" value="ocr_text">
+                            <input type="hidden" name="filename" value="<?= e(basename($path)) ?>">
+                            <button type="submit" class="warn">删除</button>
+                        </form>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    <?php endif; ?>
+
+    <h3>日语校对文件</h3>
+    <?php if ($ocrJpFiles === []) : ?>
+        <div class="muted">暂无日语校对文件。</div>
+    <?php else : ?>
+        <table>
+            <thead>
+            <tr>
+                <th>文件名</th>
+                <th>大小</th>
+                <th>更新时间</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($ocrJpFiles as $path) : ?>
+                <tr>
+                    <td><code><?= e(basename($path)) ?></code></td>
+                    <td><?= e(format_bytes((int) filesize($path))) ?></td>
+                    <td><?= e(date('Y-m-d H:i:s', (int) (filemtime($path) ?: time()))) ?></td>
+                    <td>
+                        <form method="post">
+                            <input type="hidden" name="action" value="delete_stage_file">
+                            <input type="hidden" name="project_id" value="<?= e($selectedProject['project_id']) ?>">
+                            <input type="hidden" name="stage" value="ocr_text">
+                            <input type="hidden" name="filename" value="<?= e(basename($path)) ?>">
+                            <button type="submit" class="warn">删除</button>
+                        </form>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    <?php endif; ?>
+
+    <h3>翻译文件</h3>
+    <?php if ($translationFiles === []) : ?>
+        <div class="muted">暂无翻译文件。</div>
+    <?php else : ?>
+        <table>
+            <thead>
+            <tr>
+                <th>文件名</th>
+                <th>大小</th>
+                <th>更新时间</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($translationFiles as $path) : ?>
+                <tr>
+                    <td><code><?= e(basename($path)) ?></code></td>
+                    <td><?= e(format_bytes((int) filesize($path))) ?></td>
+                    <td><?= e(date('Y-m-d H:i:s', (int) (filemtime($path) ?: time()))) ?></td>
+                    <td>
+                        <form method="post">
+                            <input type="hidden" name="action" value="delete_stage_file">
+                            <input type="hidden" name="project_id" value="<?= e($selectedProject['project_id']) ?>">
+                            <input type="hidden" name="stage" value="aigc2d_translation_text">
+                            <input type="hidden" name="filename" value="<?= e(basename($path)) ?>">
+                            <button type="submit" class="warn">删除</button>
+                        </form>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    <?php endif; ?>
+
+    <h3>校对文件</h3>
+    <?php if ($proofreadFiles === []) : ?>
+        <div class="muted">暂无校对文件。</div>
+    <?php else : ?>
+        <table>
+            <thead>
+            <tr>
+                <th>文件名</th>
+                <th>大小</th>
+                <th>更新时间</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($proofreadFiles as $path) : ?>
+                <tr>
+                    <td><code><?= e(basename($path)) ?></code></td>
+                    <td><?= e(format_bytes((int) filesize($path))) ?></td>
+                    <td><?= e(date('Y-m-d H:i:s', (int) (filemtime($path) ?: time()))) ?></td>
+                    <td>
+                        <form method="post">
+                            <input type="hidden" name="action" value="delete_stage_file">
+                            <input type="hidden" name="project_id" value="<?= e($selectedProject['project_id']) ?>">
+                            <input type="hidden" name="stage" value="proofread_text">
+                            <input type="hidden" name="filename" value="<?= e(basename($path)) ?>">
+                            <button type="submit" class="warn">删除</button>
+                        </form>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
     <?php endif; ?>
 </section>
 <?php endif; ?>
