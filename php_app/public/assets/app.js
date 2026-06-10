@@ -188,16 +188,39 @@
     return;
   }
 
-  const refreshDatalist = (datalist, items) => {
-    if (!datalist) {
+  const basename = (value) => {
+    const normalized = String(value || '').replace(/\\/g, '/');
+    const parts = normalized.split('/');
+    return parts[parts.length - 1] || normalized;
+  };
+
+  const refreshSelect = (select, items, preferredValue, placeholder) => {
+    if (!select) {
       return;
     }
-    datalist.innerHTML = '';
+    const currentValue = preferredValue || select.dataset.currentValue || '';
+    select.innerHTML = '';
+
+    const placeholderOption = document.createElement('option');
+    placeholderOption.value = '';
+    placeholderOption.textContent = placeholder || '请选择';
+    select.appendChild(placeholderOption);
+
     (items || []).forEach((value) => {
       const option = document.createElement('option');
       option.value = String(value);
-      datalist.appendChild(option);
+      option.textContent = basename(value);
+      if (String(value) === String(currentValue)) {
+        option.selected = true;
+      }
+      select.appendChild(option);
     });
+
+    const values = (items || []).map((item) => String(item));
+    if (!values.includes(String(select.value || ''))) {
+      select.value = values[0] || '';
+    }
+    select.dataset.currentValue = select.value || '';
   };
 
   forms.forEach((form) => {
@@ -208,17 +231,18 @@
     }
 
     const ocrInput = form.querySelector('[data-ocr-path-input]');
-    const ocrList = form.querySelector('[data-ocr-datalist]');
     const translationInput = form.querySelector('[data-translation-path-input]');
-    const translationList = form.querySelector('[data-translation-datalist]');
+    let lastProjectId = String(projectInput.value || '').trim();
 
     const load = async () => {
       const projectId = String(projectInput.value || '').trim();
       if (!projectId) {
-        refreshDatalist(ocrList, []);
-        refreshDatalist(translationList, []);
+        refreshSelect(ocrInput, [], '', '请选择项目内 OCR 文件');
+        refreshSelect(translationInput, [], '', '请选择项目内翻译文件');
+        lastProjectId = '';
         return;
       }
+      const projectChanged = projectId !== lastProjectId;
       try {
         const response = await fetch(endpoint + '?project_id=' + encodeURIComponent(projectId), {
           headers: { Accept: 'application/json' },
@@ -227,26 +251,26 @@
         if (!response.ok || !data.ok) {
           throw new Error(data.error || '获取项目文件失败');
         }
-        refreshDatalist(ocrList, data.ocr_files || []);
-        refreshDatalist(translationList, data.translation_files || []);
-
-        if (ocrInput && !String(ocrInput.value || '').trim() && Array.isArray(data.ocr_files) && data.ocr_files.length) {
-          ocrInput.value = data.ocr_files[0];
-        }
-        if (
-          translationInput &&
-          !String(translationInput.value || '').trim() &&
-          Array.isArray(data.translation_files) &&
-          data.translation_files.length
-        ) {
-          translationInput.value = data.translation_files[0];
-        }
+        refreshSelect(
+          ocrInput,
+          data.ocr_files || [],
+          projectChanged ? '' : ocrInput && ocrInput.value,
+          '请选择项目内 OCR 文件'
+        );
+        refreshSelect(
+          translationInput,
+          data.translation_files || [],
+          projectChanged ? '' : translationInput && translationInput.value,
+          '请选择项目内翻译文件'
+        );
+        lastProjectId = projectId;
       } catch (error) {
-        refreshDatalist(ocrList, []);
-        refreshDatalist(translationList, []);
+        refreshSelect(ocrInput, [], '', '请选择项目内 OCR 文件');
+        refreshSelect(translationInput, [], '', '请选择项目内翻译文件');
       }
     };
 
+    projectInput.addEventListener('input', load);
     projectInput.addEventListener('change', load);
     projectInput.addEventListener('blur', load);
     load();

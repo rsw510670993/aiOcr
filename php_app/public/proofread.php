@@ -124,20 +124,20 @@ render_page('校对', function () use ($error, $projectId, $ocrPath, $translatio
         </label>
         <div class="inline-fields">
             <label>OCR 合并文件
-                <input data-ocr-path-input type="text" name="ocr_path" list="ocr-path-options" value="<?= e($ocrPath) ?>">
-                <datalist id="ocr-path-options" data-ocr-datalist>
+                <select data-ocr-path-input name="ocr_path" data-current-value="<?= e($ocrPath) ?>">
+                    <option value="">请选择 OCR 合并文件</option>
                     <?php foreach ($ocrChoices as $path) : ?>
-                        <option value="<?= e($path) ?>"></option>
+                        <option value="<?= e($path) ?>" <?= $ocrPath === $path ? 'selected' : '' ?>><?= e(basename($path)) ?></option>
                     <?php endforeach; ?>
-                </datalist>
+                </select>
             </label>
             <label>翻译合并文件
-                <input data-translation-path-input type="text" name="translation_path" list="translation-path-options" value="<?= e($translationPath) ?>">
-                <datalist id="translation-path-options" data-translation-datalist>
+                <select data-translation-path-input name="translation_path" data-current-value="<?= e($translationPath) ?>">
+                    <option value="">请选择翻译合并文件</option>
                     <?php foreach ($translationChoices as $path) : ?>
-                        <option value="<?= e($path) ?>"></option>
+                        <option value="<?= e($path) ?>" <?= $translationPath === $path ? 'selected' : '' ?>><?= e(basename($path)) ?></option>
                     <?php endforeach; ?>
-                </datalist>
+                </select>
             </label>
         </div>
         <button type="submit">加载校对页</button>

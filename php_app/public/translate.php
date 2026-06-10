@@ -158,12 +158,12 @@ render_page('翻译', function () use ($error, $job, $projectChoices, $defaultPr
             </div>
         <?php endif; ?>
         <label>OCR 合并文件
-            <input data-ocr-path-input type="text" name="ocr_path" list="ocr-path-options" value="<?= e($defaultOcrPath) ?>" placeholder="请选择项目内 OCR 文件" required>
-            <datalist id="ocr-path-options" data-ocr-datalist>
+            <select data-ocr-path-input name="ocr_path" data-current-value="<?= e($defaultOcrPath) ?>" required>
+                <option value="">请选择项目内 OCR 文件</option>
                 <?php foreach ($ocrChoices as $path) : ?>
-                    <option value="<?= e($path) ?>"></option>
+                    <option value="<?= e($path) ?>" <?= $defaultOcrPath === $path ? 'selected' : '' ?>><?= e(basename($path)) ?></option>
                 <?php endforeach; ?>
-            </datalist>
+            </select>
         </label>
         <label>页码范围（可选）
             <input type="text" name="pages" placeholder="例如：7-56，不填则使用全部页码">
