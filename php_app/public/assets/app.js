@@ -181,3 +181,74 @@
 
   render();
 })();
+
+(function () {
+  const forms = document.querySelectorAll('[data-project-files-form]');
+  if (!forms.length) {
+    return;
+  }
+
+  const refreshDatalist = (datalist, items) => {
+    if (!datalist) {
+      return;
+    }
+    datalist.innerHTML = '';
+    (items || []).forEach((value) => {
+      const option = document.createElement('option');
+      option.value = String(value);
+      datalist.appendChild(option);
+    });
+  };
+
+  forms.forEach((form) => {
+    const endpoint = form.dataset.projectFilesUrl;
+    const projectInput = form.querySelector('[data-project-id-input]');
+    if (!endpoint || !projectInput) {
+      return;
+    }
+
+    const ocrInput = form.querySelector('[data-ocr-path-input]');
+    const ocrList = form.querySelector('[data-ocr-datalist]');
+    const translationInput = form.querySelector('[data-translation-path-input]');
+    const translationList = form.querySelector('[data-translation-datalist]');
+
+    const load = async () => {
+      const projectId = String(projectInput.value || '').trim();
+      if (!projectId) {
+        refreshDatalist(ocrList, []);
+        refreshDatalist(translationList, []);
+        return;
+      }
+      try {
+        const response = await fetch(endpoint + '?project_id=' + encodeURIComponent(projectId), {
+          headers: { Accept: 'application/json' },
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+          throw new Error(data.error || '获取项目文件失败');
+        }
+        refreshDatalist(ocrList, data.ocr_files || []);
+        refreshDatalist(translationList, data.translation_files || []);
+
+        if (ocrInput && !String(ocrInput.value || '').trim() && Array.isArray(data.ocr_files) && data.ocr_files.length) {
+          ocrInput.value = data.ocr_files[0];
+        }
+        if (
+          translationInput &&
+          !String(translationInput.value || '').trim() &&
+          Array.isArray(data.translation_files) &&
+          data.translation_files.length
+        ) {
+          translationInput.value = data.translation_files[0];
+        }
+      } catch (error) {
+        refreshDatalist(ocrList, []);
+        refreshDatalist(translationList, []);
+      }
+    };
+
+    projectInput.addEventListener('change', load);
+    projectInput.addEventListener('blur', load);
+    load();
+  });
+})();

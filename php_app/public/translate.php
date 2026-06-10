@@ -142,9 +142,9 @@ render_page('翻译', function () use ($error, $job, $projectChoices, $defaultPr
     <?php if ($error !== '') : ?>
         <div class="alert error"><?= e($error) ?></div>
     <?php endif; ?>
-    <form method="post">
+    <form method="post" data-project-files-form data-project-files-url="<?= e(url('projectFiles.php')) ?>">
         <label>项目 ID
-            <input type="text" name="project_id" list="project-id-options" value="<?= e($defaultProjectId) ?>" placeholder="例如：book_01" required>
+            <input data-project-id-input type="text" name="project_id" list="project-id-options" value="<?= e($defaultProjectId) ?>" placeholder="例如：book_01" required>
             <datalist id="project-id-options">
                 <?php foreach ($projectChoices as $item) : ?>
                     <option value="<?= e($item['id']) ?>"></option>
@@ -158,8 +158,8 @@ render_page('翻译', function () use ($error, $job, $projectChoices, $defaultPr
             </div>
         <?php endif; ?>
         <label>OCR 合并文件
-            <input type="text" name="ocr_path" list="ocr-path-options" value="<?= e($defaultOcrPath) ?>" placeholder="请选择项目内 OCR 文件" required>
-            <datalist id="ocr-path-options">
+            <input data-ocr-path-input type="text" name="ocr_path" list="ocr-path-options" value="<?= e($defaultOcrPath) ?>" placeholder="请选择项目内 OCR 文件" required>
+            <datalist id="ocr-path-options" data-ocr-datalist>
                 <?php foreach ($ocrChoices as $path) : ?>
                     <option value="<?= e($path) ?>"></option>
                 <?php endforeach; ?>
