@@ -176,7 +176,7 @@ render_page('校对', function () use ($error, $projectId, $ocrPath, $translatio
         <div class="proofread-meta">
             <span id="page-indicator" class="page-indicator">P1</span>
             <span id="page-counter">第 1 / 1 页</span>
-            <label><input type="checkbox" id="completed-toggle"> 标记当前页已校</label>
+            <label><input type="checkbox" id="completed-toggle"> 已校</label>
             <span id="proofread-status-text" class="muted"></span>
             <span id="save-message" class="small"></span>
         </div>
