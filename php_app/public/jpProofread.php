@@ -171,7 +171,7 @@ render_page('日语校对', function () use ($error, $projectId, $ocrPath, $proj
             </div>
             <div>
                 <h3>日语校对稿</h3>
-                <textarea id="proofread-text"></textarea>
+                <textarea id="proofread-text" data-auto-resize="true"></textarea>
             </div>
         </div>
     </section>

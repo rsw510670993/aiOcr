@@ -165,7 +165,6 @@ render_page('校对', function () use ($error, $projectId, $ocrPath, $translatio
         <h2>当前校对稿</h2>
         <div class="proofread-meta">
             <span>项目：<code><?= e($proofreadPayload['project_id']) ?></code></span>
-            <span>OCR：<code><?= e(basename((string) $proofreadPayload['ocr_path'])) ?></code></span>
             <span>译文：<code><?= e(basename((string) $proofreadPayload['translation_path'])) ?></code></span>
             <span>校对稿：<code><?= e(basename((string) $proofreadPayload['proofread_path'])) ?></code></span>
         </div>
@@ -186,18 +185,14 @@ render_page('校对', function () use ($error, $projectId, $ocrPath, $translatio
             <button type="button" class="success" id="save-current">保存当前页</button>
             <button type="button" class="warn" id="save-all">保存全部</button>
         </div>
-        <div class="proofread-layout">
+        <div class="proofread-layout proofread-layout-translation">
             <div class="proofread-image">
                 <h3>图片</h3>
                 <img id="proofread-image" alt="当前漫画页">
             </div>
             <div>
-                <h3>OCR 文本</h3>
-                <textarea id="ocr-text" readonly></textarea>
                 <h3>机器译文</h3>
                 <textarea id="translation-text" readonly></textarea>
-            </div>
-            <div>
                 <h3>人工校对稿</h3>
                 <textarea id="proofread-text"></textarea>
             </div>

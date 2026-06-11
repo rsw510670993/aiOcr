@@ -99,6 +99,14 @@
     saveAllButton: document.getElementById('save-all'),
   };
 
+  const autoResize = (textarea) => {
+    if (!textarea || textarea.dataset.autoResize !== 'true') {
+      return;
+    }
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+  };
+
   const syncCurrentDraft = () => {
     const page = state.pages[state.index];
     page.proofread_text = el.proofreadText.value;
@@ -115,11 +123,14 @@
     el.pageIndicator.textContent = 'P' + page.page;
     el.pageCounter.textContent = '第 ' + (state.index + 1) + ' / ' + state.pages.length + ' 页';
     el.image.src = page.image_url;
-    el.ocrText.value = page.ocr_text;
+    if (el.ocrText) {
+      el.ocrText.value = page.ocr_text || '';
+    }
     if (el.translationText) {
       el.translationText.value = page.translation_text || '';
     }
     el.proofreadText.value = page.proofread_text;
+    autoResize(el.proofreadText);
     el.completedToggle.checked = state.completedPages.has(page.page);
     el.statusText.textContent = '已校页数：' + state.completedPages.size + ' / ' + state.pages.length;
     el.prevButton.disabled = state.index === 0;
@@ -151,6 +162,7 @@
 
   el.proofreadText.addEventListener('input', () => {
     state.pages[state.index].proofread_text = el.proofreadText.value;
+    autoResize(el.proofreadText);
   });
 
   el.completedToggle.addEventListener('change', () => {
