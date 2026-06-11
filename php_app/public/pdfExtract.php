@@ -19,6 +19,21 @@ $writeLog = static function (array $job, string $content): void {
     file_put_contents((string) $job['log_file'], trim($content) . PHP_EOL, FILE_APPEND);
 };
 
+$deleteFileAndStatus = static function (string $path, bool $mustExist = true): void {
+    if (is_file($path)) {
+        if (!@unlink($path)) {
+            throw new RuntimeException('无法删除文件：' . basename($path));
+        }
+    } elseif ($mustExist) {
+        throw new RuntimeException('文件不存在：' . basename($path));
+    }
+
+    $statusPath = $path . '.status.json';
+    if (is_file($statusPath)) {
+        @unlink($statusPath);
+    }
+};
+
 $deleteTree = static function (string $path): void {
     if (!is_dir($path)) {
         return;
@@ -155,28 +170,11 @@ if (request_method() === 'POST') {
                 throw new RuntimeException('不支持的阶段：' . $stage);
             }
             $target = $project[$stage] . '/' . $filename;
-            if (!is_file($target)) {
-                throw new RuntimeException('文件不存在：' . $filename);
-            }
-            if (!@unlink($target)) {
-                throw new RuntimeException('无法删除文件：' . $filename);
-            }
-            if (is_file($target . '.status.json')) {
-                @unlink($target . '.status.json');
-            }
+            $deleteFileAndStatus($target, true);
             if ($stage === 'ocr_text') {
-                if (str_ends_with($filename, '.jp.txt')) {
-                    if (is_file($target . '.status.json')) {
-                        @unlink($target . '.status.json');
-                    }
-                } elseif (str_ends_with($filename, '.txt')) {
+                if (str_ends_with($filename, '.txt') && !str_ends_with($filename, '.jp.txt')) {
                     $jpPath = $project['ocr_text'] . '/' . substr($filename, 0, -4) . '.jp.txt';
-                    if (is_file($jpPath)) {
-                        @unlink($jpPath);
-                    }
-                    if (is_file($jpPath . '.status.json')) {
-                        @unlink($jpPath . '.status.json');
-                    }
+                    $deleteFileAndStatus($jpPath, false);
                 }
             }
             redirect_to('pdfExtract.php', ['project_id' => $projectId, 'success' => '已删除文件：' . $filename]);
