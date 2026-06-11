@@ -119,6 +119,9 @@ pre {
 .proofread-layout.proofread-layout-translation { grid-template-columns: minmax(320px, 1.1fr) minmax(420px, 1.4fr); }
 .proofread-layout.proofread-layout-jp { grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr); }
 .proofread-stack { display: grid; gap: 16px; align-content: start; }
+.proofread-layout.proofread-layout-translation textarea {
+  min-height: 220px;
+}
 .proofread-image img { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
 .proofread-meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
 .proofread-meta label {

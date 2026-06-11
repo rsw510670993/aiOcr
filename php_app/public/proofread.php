@@ -190,11 +190,15 @@ render_page('校对', function () use ($error, $projectId, $ocrPath, $translatio
                 <h3>图片</h3>
                 <img id="proofread-image" alt="当前漫画页">
             </div>
-            <div>
-                <h3>机器译文</h3>
-                <textarea id="translation-text" readonly></textarea>
-                <h3>人工校对稿</h3>
-                <textarea id="proofread-text"></textarea>
+            <div class="proofread-stack">
+                <div>
+                    <h3>机器译文</h3>
+                    <textarea id="translation-text" readonly></textarea>
+                </div>
+                <div>
+                    <h3>人工校对稿</h3>
+                    <textarea id="proofread-text"></textarea>
+                </div>
             </div>
         </div>
     </section>
