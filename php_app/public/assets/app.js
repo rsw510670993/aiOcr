@@ -126,6 +126,9 @@
   };
 
   const syncCurrentDraft = () => {
+    if (!el.proofreadText || !el.completedToggle) {
+      return;
+    }
     const page = state.pages[state.index];
     page.proofread_text = el.proofreadText.value;
     page.completed = !!el.completedToggle.checked;
@@ -137,6 +140,19 @@
   };
 
   const render = () => {
+    if (
+      !el.pageIndicator ||
+      !el.pageCounter ||
+      !el.image ||
+      !el.proofreadText ||
+      !el.completedToggle ||
+      !el.statusText ||
+      !el.prevButton ||
+      !el.nextButton
+    ) {
+      console.warn('proofread app missing required elements');
+      return;
+    }
     const page = state.pages[state.index];
     el.pageIndicator.textContent = 'P' + page.page;
     el.pageCounter.textContent = '第 ' + (state.index + 1) + ' / ' + state.pages.length + ' 页';
@@ -178,10 +194,12 @@
     render();
   };
 
-  el.proofreadText.addEventListener('input', () => {
-    state.pages[state.index].proofread_text = el.proofreadText.value;
-    scheduleAutoResize(el.proofreadText);
-  });
+  if (el.proofreadText) {
+    el.proofreadText.addEventListener('input', () => {
+      state.pages[state.index].proofread_text = el.proofreadText.value;
+      scheduleAutoResize(el.proofreadText);
+    });
+  }
 
   if (el.image) {
     el.image.addEventListener('load', () => {
@@ -189,38 +207,52 @@
     });
   }
 
-  el.completedToggle.addEventListener('change', () => {
-    syncCurrentDraft();
-    render();
-  });
+  if (el.completedToggle) {
+    el.completedToggle.addEventListener('change', () => {
+      syncCurrentDraft();
+      render();
+    });
+  }
 
-  el.prevButton.addEventListener('click', () => {
-    syncCurrentDraft();
-    state.index -= 1;
-    render();
-  });
+  if (el.prevButton) {
+    el.prevButton.addEventListener('click', () => {
+      syncCurrentDraft();
+      state.index -= 1;
+      render();
+    });
+  }
 
-  el.nextButton.addEventListener('click', () => {
-    syncCurrentDraft();
-    state.index += 1;
-    render();
-  });
+  if (el.nextButton) {
+    el.nextButton.addEventListener('click', () => {
+      syncCurrentDraft();
+      state.index += 1;
+      render();
+    });
+  }
 
-  el.saveCurrentButton.addEventListener('click', async () => {
-    try {
-      await save('当前页已保存');
-    } catch (error) {
-      el.saveMessage.textContent = String(error);
-    }
-  });
+  if (el.saveCurrentButton) {
+    el.saveCurrentButton.addEventListener('click', async () => {
+      try {
+        await save('当前页已保存');
+      } catch (error) {
+        if (el.saveMessage) {
+          el.saveMessage.textContent = String(error);
+        }
+      }
+    });
+  }
 
-  el.saveAllButton.addEventListener('click', async () => {
-    try {
-      await save('全部页已保存');
-    } catch (error) {
-      el.saveMessage.textContent = String(error);
-    }
-  });
+  if (el.saveAllButton) {
+    el.saveAllButton.addEventListener('click', async () => {
+      try {
+        await save('全部页已保存');
+      } catch (error) {
+        if (el.saveMessage) {
+          el.saveMessage.textContent = String(error);
+        }
+      }
+    });
+  }
 
   window.addEventListener('load', () => {
     scheduleAutoResize(el.proofreadText);
