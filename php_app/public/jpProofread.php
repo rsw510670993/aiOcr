@@ -160,18 +160,20 @@ render_page('日语校对', function () use ($error, $projectId, $ocrPath, $proj
             <button type="button" class="success" id="save-current">保存当前页</button>
             <button type="button" class="warn" id="save-all">保存全部</button>
         </div>
-        <div class="proofread-layout">
+        <div class="proofread-layout proofread-layout-jp">
             <div class="proofread-image">
                 <h3>图片</h3>
                 <img id="proofread-image" alt="当前漫画页">
             </div>
-            <div>
-                <h3>OCR 文本</h3>
-                <textarea id="ocr-text" readonly></textarea>
-            </div>
-            <div>
-                <h3>日语校对稿</h3>
-                <textarea id="proofread-text" data-auto-resize="true"></textarea>
+            <div class="proofread-stack">
+                <div>
+                    <h3>日语校对稿</h3>
+                    <textarea id="proofread-text" data-auto-resize="true"></textarea>
+                </div>
+                <div>
+                    <h3>OCR 文本</h3>
+                    <textarea id="ocr-text" readonly></textarea>
+                </div>
             </div>
         </div>
     </section>

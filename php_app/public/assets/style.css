@@ -117,6 +117,8 @@ pre {
 .job-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: #fff; }
 .proofread-layout { display: grid; grid-template-columns: minmax(280px, 1.1fr) minmax(260px, 1fr) minmax(320px, 1.2fr); gap: 16px; }
 .proofread-layout.proofread-layout-translation { grid-template-columns: minmax(320px, 1.1fr) minmax(420px, 1.4fr); }
+.proofread-layout.proofread-layout-jp { grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr); }
+.proofread-stack { display: grid; gap: 16px; align-content: start; }
 .proofread-image img { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
 .proofread-meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
 .proofread-meta label {
@@ -129,6 +131,9 @@ pre {
 .proofread-layout textarea[data-auto-resize="true"] {
   resize: none;
   overflow: hidden;
+}
+.proofread-layout.proofread-layout-jp textarea {
+  min-height: 220px;
 }
 .page-indicator { font-weight: 700; }
 .small { font-size: 12px; }

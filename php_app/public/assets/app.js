@@ -117,6 +117,12 @@
         autoResize(textarea);
       });
     });
+    window.setTimeout(() => {
+      autoResize(textarea);
+    }, 0);
+    window.setTimeout(() => {
+      autoResize(textarea);
+    }, 80);
   };
 
   const syncCurrentDraft = () => {
@@ -177,6 +183,12 @@
     scheduleAutoResize(el.proofreadText);
   });
 
+  if (el.image) {
+    el.image.addEventListener('load', () => {
+      scheduleAutoResize(el.proofreadText);
+    });
+  }
+
   el.completedToggle.addEventListener('change', () => {
     syncCurrentDraft();
     render();
@@ -211,6 +223,10 @@
   });
 
   window.addEventListener('load', () => {
+    scheduleAutoResize(el.proofreadText);
+  });
+
+  window.addEventListener('resize', () => {
     scheduleAutoResize(el.proofreadText);
   });
 
