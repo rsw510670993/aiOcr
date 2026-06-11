@@ -107,6 +107,18 @@
     textarea.style.height = textarea.scrollHeight + 'px';
   };
 
+  const scheduleAutoResize = (textarea) => {
+    if (!textarea || textarea.dataset.autoResize !== 'true') {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      autoResize(textarea);
+      window.requestAnimationFrame(() => {
+        autoResize(textarea);
+      });
+    });
+  };
+
   const syncCurrentDraft = () => {
     const page = state.pages[state.index];
     page.proofread_text = el.proofreadText.value;
@@ -130,7 +142,7 @@
       el.translationText.value = page.translation_text || '';
     }
     el.proofreadText.value = page.proofread_text;
-    autoResize(el.proofreadText);
+    scheduleAutoResize(el.proofreadText);
     el.completedToggle.checked = state.completedPages.has(page.page);
     el.statusText.textContent = '已校页数：' + state.completedPages.size + ' / ' + state.pages.length;
     el.prevButton.disabled = state.index === 0;
@@ -162,7 +174,7 @@
 
   el.proofreadText.addEventListener('input', () => {
     state.pages[state.index].proofread_text = el.proofreadText.value;
-    autoResize(el.proofreadText);
+    scheduleAutoResize(el.proofreadText);
   });
 
   el.completedToggle.addEventListener('change', () => {
@@ -196,6 +208,10 @@
     } catch (error) {
       el.saveMessage.textContent = String(error);
     }
+  });
+
+  window.addEventListener('load', () => {
+    scheduleAutoResize(el.proofreadText);
   });
 
   render();
