@@ -129,8 +129,8 @@ pre {
   white-space: nowrap;
 }
 .proofread-layout textarea[data-auto-resize="true"] {
-  resize: none;
-  overflow: hidden;
+  resize: vertical;
+  overflow-y: auto;
 }
 .proofread-layout.proofread-layout-jp textarea {
   min-height: 220px;
