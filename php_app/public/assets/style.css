@@ -118,6 +118,13 @@ pre {
 .proofread-layout { display: grid; grid-template-columns: minmax(280px, 1.1fr) minmax(260px, 1fr) minmax(320px, 1.2fr); gap: 16px; }
 .proofread-image img { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
 .proofread-meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.proofread-meta label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  white-space: nowrap;
+}
 .page-indicator { font-weight: 700; }
 .small { font-size: 12px; }
 .hidden { display: none !important; }
