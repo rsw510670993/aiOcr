@@ -427,6 +427,168 @@ render_page('创建项目', function () use ($error, $success, $job, $projectId,
 
 <?php if ($selectedProject) : ?>
 <section class="panel">
+    <h2>阶段文件管理</h2>
+    <div class="alert">删除原始 OCR 文件（.txt）时，会同时删除同名日语校对文件（.jp.txt）及其状态文件（如存在）。</div>
+    <div class="stage-file-grid">
+        <div class="stage-file-card">
+            <h3>OCR 原始文件</h3>
+            <?php if ($ocrRawFiles === []) : ?>
+                <div class="muted">暂无 OCR 原始文件。</div>
+            <?php else : ?>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>文件名</th>
+                        <th>大小</th>
+                        <th>更新时间</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($ocrRawFiles as $path) : ?>
+                        <tr>
+                            <td><code><?= e(basename($path)) ?></code></td>
+                            <td><?= e(format_bytes((int) filesize($path))) ?></td>
+                            <td><?= e(date('Y-m-d H:i:s', (int) (filemtime($path) ?: time()))) ?></td>
+                            <td>
+                                <div class="button-row compact">
+                                    <a class="button ghost" href="<?= e($downloadFileUrl($path)) ?>">下载</a>
+                                    <form method="post" class="inline-form">
+                                        <input type="hidden" name="action" value="delete_stage_file">
+                                        <input type="hidden" name="project_id" value="<?= e($selectedProject['project_id']) ?>">
+                                        <input type="hidden" name="stage" value="ocr_text">
+                                        <input type="hidden" name="filename" value="<?= e(basename($path)) ?>">
+                                        <button type="submit" class="warn">删除</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+        </div>
+
+        <div class="stage-file-card">
+            <h3>日语校对文件</h3>
+            <?php if ($ocrJpFiles === []) : ?>
+                <div class="muted">暂无日语校对文件。</div>
+            <?php else : ?>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>文件名</th>
+                        <th>大小</th>
+                        <th>更新时间</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($ocrJpFiles as $path) : ?>
+                        <tr>
+                            <td><code><?= e(basename($path)) ?></code></td>
+                            <td><?= e(format_bytes((int) filesize($path))) ?></td>
+                            <td><?= e(date('Y-m-d H:i:s', (int) (filemtime($path) ?: time()))) ?></td>
+                            <td>
+                                <div class="button-row compact">
+                                    <a class="button ghost" href="<?= e($downloadFileUrl($path)) ?>">下载</a>
+                                    <form method="post" class="inline-form">
+                                        <input type="hidden" name="action" value="delete_stage_file">
+                                        <input type="hidden" name="project_id" value="<?= e($selectedProject['project_id']) ?>">
+                                        <input type="hidden" name="stage" value="ocr_text">
+                                        <input type="hidden" name="filename" value="<?= e(basename($path)) ?>">
+                                        <button type="submit" class="warn">删除</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+        </div>
+
+        <div class="stage-file-card">
+            <h3>翻译文件</h3>
+            <?php if ($translationFiles === []) : ?>
+                <div class="muted">暂无翻译文件。</div>
+            <?php else : ?>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>文件名</th>
+                        <th>大小</th>
+                        <th>更新时间</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($translationFiles as $path) : ?>
+                        <tr>
+                            <td><code><?= e(basename($path)) ?></code></td>
+                            <td><?= e(format_bytes((int) filesize($path))) ?></td>
+                            <td><?= e(date('Y-m-d H:i:s', (int) (filemtime($path) ?: time()))) ?></td>
+                            <td>
+                                <div class="button-row compact">
+                                    <a class="button ghost" href="<?= e($downloadFileUrl($path)) ?>">下载</a>
+                                    <form method="post" class="inline-form">
+                                        <input type="hidden" name="action" value="delete_stage_file">
+                                        <input type="hidden" name="project_id" value="<?= e($selectedProject['project_id']) ?>">
+                                        <input type="hidden" name="stage" value="aigc2d_translation_text">
+                                        <input type="hidden" name="filename" value="<?= e(basename($path)) ?>">
+                                        <button type="submit" class="warn">删除</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+        </div>
+
+        <div class="stage-file-card">
+            <h3>校对文件</h3>
+            <?php if ($proofreadFiles === []) : ?>
+                <div class="muted">暂无校对文件。</div>
+            <?php else : ?>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>文件名</th>
+                        <th>大小</th>
+                        <th>更新时间</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($proofreadFiles as $path) : ?>
+                        <tr>
+                            <td><code><?= e(basename($path)) ?></code></td>
+                            <td><?= e(format_bytes((int) filesize($path))) ?></td>
+                            <td><?= e(date('Y-m-d H:i:s', (int) (filemtime($path) ?: time()))) ?></td>
+                            <td>
+                                <div class="button-row compact">
+                                    <a class="button ghost" href="<?= e($downloadFileUrl($path)) ?>">下载</a>
+                                    <form method="post" class="inline-form">
+                                        <input type="hidden" name="action" value="delete_stage_file">
+                                        <input type="hidden" name="project_id" value="<?= e($selectedProject['project_id']) ?>">
+                                        <input type="hidden" name="stage" value="proofread_text">
+                                        <input type="hidden" name="filename" value="<?= e(basename($path)) ?>">
+                                        <button type="submit" class="warn">删除</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+        </div>
+    </div>
+</section>
+
+<section class="panel">
     <h2>项目图片管理</h2>
     <div class="proofread-meta">
         <span>项目：<code><?= e($selectedProject['project_id']) ?></code></span>
@@ -455,159 +617,6 @@ render_page('创建项目', function () use ($error, $success, $job, $projectId,
                 </div>
             <?php endforeach; ?>
         </div>
-    <?php endif; ?>
-</section>
-
-<section class="panel">
-    <h2>阶段文件管理</h2>
-    <div class="alert">删除原始 OCR 文件（.txt）时，会同时删除同名日语校对文件（.jp.txt）及其状态文件（如存在）。</div>
-
-    <h3>OCR 原始文件</h3>
-    <?php if ($ocrRawFiles === []) : ?>
-        <div class="muted">暂无 OCR 原始文件。</div>
-    <?php else : ?>
-        <table>
-            <thead>
-            <tr>
-                <th>文件名</th>
-                <th>大小</th>
-                <th>更新时间</th>
-                <th></th>
-            </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($ocrRawFiles as $path) : ?>
-                <tr>
-                    <td><code><?= e(basename($path)) ?></code></td>
-                    <td><?= e(format_bytes((int) filesize($path))) ?></td>
-                    <td><?= e(date('Y-m-d H:i:s', (int) (filemtime($path) ?: time()))) ?></td>
-                    <td>
-                        <div class="button-row compact">
-                            <a class="button ghost" href="<?= e($downloadFileUrl($path)) ?>">下载</a>
-                            <form method="post" class="inline-form">
-                                <input type="hidden" name="action" value="delete_stage_file">
-                                <input type="hidden" name="project_id" value="<?= e($selectedProject['project_id']) ?>">
-                                <input type="hidden" name="stage" value="ocr_text">
-                                <input type="hidden" name="filename" value="<?= e(basename($path)) ?>">
-                                <button type="submit" class="warn">删除</button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    <?php endif; ?>
-
-    <h3>日语校对文件</h3>
-    <?php if ($ocrJpFiles === []) : ?>
-        <div class="muted">暂无日语校对文件。</div>
-    <?php else : ?>
-        <table>
-            <thead>
-            <tr>
-                <th>文件名</th>
-                <th>大小</th>
-                <th>更新时间</th>
-                <th></th>
-            </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($ocrJpFiles as $path) : ?>
-                <tr>
-                    <td><code><?= e(basename($path)) ?></code></td>
-                    <td><?= e(format_bytes((int) filesize($path))) ?></td>
-                    <td><?= e(date('Y-m-d H:i:s', (int) (filemtime($path) ?: time()))) ?></td>
-                    <td>
-                        <div class="button-row compact">
-                            <a class="button ghost" href="<?= e($downloadFileUrl($path)) ?>">下载</a>
-                            <form method="post" class="inline-form">
-                                <input type="hidden" name="action" value="delete_stage_file">
-                                <input type="hidden" name="project_id" value="<?= e($selectedProject['project_id']) ?>">
-                                <input type="hidden" name="stage" value="ocr_text">
-                                <input type="hidden" name="filename" value="<?= e(basename($path)) ?>">
-                                <button type="submit" class="warn">删除</button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    <?php endif; ?>
-
-    <h3>翻译文件</h3>
-    <?php if ($translationFiles === []) : ?>
-        <div class="muted">暂无翻译文件。</div>
-    <?php else : ?>
-        <table>
-            <thead>
-            <tr>
-                <th>文件名</th>
-                <th>大小</th>
-                <th>更新时间</th>
-                <th></th>
-            </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($translationFiles as $path) : ?>
-                <tr>
-                    <td><code><?= e(basename($path)) ?></code></td>
-                    <td><?= e(format_bytes((int) filesize($path))) ?></td>
-                    <td><?= e(date('Y-m-d H:i:s', (int) (filemtime($path) ?: time()))) ?></td>
-                    <td>
-                        <div class="button-row compact">
-                            <a class="button ghost" href="<?= e($downloadFileUrl($path)) ?>">下载</a>
-                            <form method="post" class="inline-form">
-                                <input type="hidden" name="action" value="delete_stage_file">
-                                <input type="hidden" name="project_id" value="<?= e($selectedProject['project_id']) ?>">
-                                <input type="hidden" name="stage" value="aigc2d_translation_text">
-                                <input type="hidden" name="filename" value="<?= e(basename($path)) ?>">
-                                <button type="submit" class="warn">删除</button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    <?php endif; ?>
-
-    <h3>校对文件</h3>
-    <?php if ($proofreadFiles === []) : ?>
-        <div class="muted">暂无校对文件。</div>
-    <?php else : ?>
-        <table>
-            <thead>
-            <tr>
-                <th>文件名</th>
-                <th>大小</th>
-                <th>更新时间</th>
-                <th></th>
-            </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($proofreadFiles as $path) : ?>
-                <tr>
-                    <td><code><?= e(basename($path)) ?></code></td>
-                    <td><?= e(format_bytes((int) filesize($path))) ?></td>
-                    <td><?= e(date('Y-m-d H:i:s', (int) (filemtime($path) ?: time()))) ?></td>
-                    <td>
-                        <div class="button-row compact">
-                            <a class="button ghost" href="<?= e($downloadFileUrl($path)) ?>">下载</a>
-                            <form method="post" class="inline-form">
-                                <input type="hidden" name="action" value="delete_stage_file">
-                                <input type="hidden" name="project_id" value="<?= e($selectedProject['project_id']) ?>">
-                                <input type="hidden" name="stage" value="proofread_text">
-                                <input type="hidden" name="filename" value="<?= e(basename($path)) ?>">
-                                <button type="submit" class="warn">删除</button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
     <?php endif; ?>
 </section>
 <?php endif; ?>

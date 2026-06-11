@@ -154,6 +154,32 @@ pre {
   display: grid;
   gap: 4px;
 }
+.stage-file-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.stage-file-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px;
+}
+.stage-file-card table {
+  font-size: 13px;
+}
+.stage-file-card th,
+.stage-file-card td {
+  padding: 8px 6px;
+}
+.stage-file-card code {
+  word-break: break-all;
+}
+.stage-file-card .button-row.compact {
+  gap: 8px;
+}
 .project-rules {
   margin-top: 18px;
 }
@@ -164,4 +190,8 @@ pre {
 @media (max-width: 1000px) {
   .proofread-layout { grid-template-columns: 1fr; }
   .header-row { flex-direction: column; align-items: flex-start; }
+  .stage-file-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .stage-file-grid { grid-template-columns: 1fr; }
 }
