@@ -12,7 +12,6 @@ from ollama_qwen3_translate import (
     matched_glossary_terms,
     invalid_translation_reason,
     load_glossary,
-    normalize_brackets,
     strip_thinking,
 )
 
@@ -25,8 +24,29 @@ SYSTEM_PROMPT = """你是专业的日语漫画汉化翻译。
 最终译文不得残留平假名、片假名、日语正文、解释或 Markdown。
 输入包含 P{页码} 标记时，必须原样保留每一个页码标记及页码顺序，不得遗漏、增加或翻译页码。
 翻译时联系所有页面的前后文，保持人物称呼、语气和术语一致。
-所有括号和引号只能使用「」与『』。
+引号使用「」与『』；校对后的日语稿中用（）标记的背景小字，翻译后继续保留为（） ，不要改成直角括号。
 只输出 JSON：{"translation":"最终中文译文"}。"""
+
+
+def normalize_translation_punctuation(text: str) -> str:
+    translation = str.maketrans(
+        {
+            "“": "「",
+            "”": "」",
+            "‘": "「",
+            "’": "」",
+            "(": "（",
+            ")": "）",
+        }
+    )
+    normalized = text.translate(translation)
+    parts = normalized.split('"')
+    if len(parts) == 1:
+        return normalized
+    return "".join(
+        part + ("「" if index % 2 == 0 else "」")
+        for index, part in enumerate(parts[:-1])
+    ) + parts[-1]
 
 
 def parse_args() -> argparse.Namespace:
@@ -91,7 +111,7 @@ def parse_translation(content: str) -> str:
         raise RuntimeError(f"Unexpected translation content: {content}") from exc
     if not isinstance(translated, str):
         raise RuntimeError("Translation response field is not a string")
-    return normalize_brackets(
+    return normalize_translation_punctuation(
         "\n".join(line.strip() for line in translated.splitlines() if line.strip())
     )
 
