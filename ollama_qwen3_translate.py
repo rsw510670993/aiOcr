@@ -441,7 +441,7 @@ def invalid_translation_reason(
     if japanese_match:
         return f"untranslated Japanese kana detected: {japanese_match.group(0)}"
     disallowed_bracket = re.search(
-        r'["“”‘’()（）\[\]【】《》〈〉{}｛｝<>]', stripped
+        r'["“”‘’()\[\]【】《》〈〉{}｛｝<>]', stripped
     )
     if disallowed_bracket:
         return f"disallowed bracket detected: {disallowed_bracket.group(0)}"
